@@ -1,0 +1,98 @@
+name: Publish plugin release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Restore, build, and test
+        run: |
+          dotnet restore Jellyfin.Plugin.CommunityRating.sln
+          dotnet build Jellyfin.Plugin.CommunityRating.sln -c Release --no-restore -m:1
+          dotnet test Jellyfin.Plugin.CommunityRating.sln -c Release --no-build --no-restore -m:1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test web renderer
+        run: node tests/web/community-rating.test.cjs
+      - name: Check release tag matches plugin version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          project = ET.parse("src/Jellyfin.Plugin.CommunityRating/Jellyfin.Plugin.CommunityRating.csproj")
+          version = project.findtext(".//Version")
+          tag_version = os.environ["TAG"].removeprefix("v")
+          if tag_version != version:
+              raise SystemExit(f"Release tag {tag_version} does not match project version {version}")
+          PY
+      - name: Publish plugin files
+        run: >-
+          dotnet publish src/Jellyfin.Plugin.CommunityRating/Jellyfin.Plugin.CommunityRating.csproj
+          -c Release --no-build --no-restore -o ./publish
+      - name: Package plugin and calculate checksum
+        id: package
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          archive="community-rating-${TAG#v}.zip"
+          (cd publish && zip -q -r "../$archive" .)
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "checksum=$(md5sum "$archive" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Upload release archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" "${{ steps.package.outputs.archive }}" --clobber
+      - name: Update plugin repository manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          tag = os.environ["TAG"]
+          version = tag.removeprefix("v")
+          manifest_path = Path("manifest.json")
+          manifest = json.loads(manifest_path.read_text())
+          plugin = next(entry for entry in manifest if entry.get("guid") == "8b270d4b-75f2-4ad3-9be6-1c18684945c9")
+          plugin["versions"] = [entry for entry in plugin["versions"] if entry["version"] != version]
+          plugin["versions"].insert(0, {
+              "version": version,
+              "changelog": "See the GitHub release notes.",
+              "targetAbi": "10.11.11.0",
+              "sourceUrl": f"https://github.com/ShamanTramp/Community-Rating/releases/download/{tag}/{os.environ['ARCHIVE']}",
+              "checksum": os.environ["CHECKSUM"],
+              "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+          })
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: update plugin manifest for ${TAG}"
+          git push origin main

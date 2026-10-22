@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "8b270d4b-75f2-4ad3-9be6-1c18684945c9",
+    "name": "Community Rating",
+    "description": "Shows view and favorite totals from active Jellyfin members on media cards and detail pages.",
+    "overview": "Aggregates played and favorite markers across active, included Jellyfin accounts, with optional administrator-only member name tooltips.",
+    "owner": "ShamanTramp",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Initial release: member views and favorites, configurable card layout, library sorting, administrator tooltips, and scheduled reconciliation.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.0.0.zip",
+        "checksum": "27b859b6c769ba6cdb8f5ebd46a8f1cb",
+        "timestamp": "2026-10-22T05:05:25Z"
+      }
+    ],
+    "imageUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/assets/community-rating-cover.png"
+  }
+]

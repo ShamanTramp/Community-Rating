@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Community Rating</title>
+</head>
+<body>
+    <div id="CommunityRatingConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="CommunityRatingConfigForm">
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="EnableBadges" type="checkbox" is="emby-checkbox" />
+                            <span>Afficher les compteurs de vues et de favoris</span>
+                        </label>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ExcludedUserNames">Comptes à exclure</label>
+                        <input id="ExcludedUserNames" type="text" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription">Noms Jellyfin séparés par des virgules. Les comptes désactivés sont toujours exclus. Laisser vide pour ne pas exclure d’autres comptes.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="EnableAdminTooltips" type="checkbox" is="emby-checkbox" />
+                            <span>Autoriser les administrateurs à voir les pseudos dans les infobulles</span>
+                        </label>
+                        <div class="fieldDescription">Désactivé par défaut. Les pseudos restent réservés aux administrateurs et ne sont pas exposés aux autres comptes.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="StackCardBadges">Disposition des compteurs sur les vignettes</label>
+                        <select id="StackCardBadges" is="emby-select" class="emby-select-withcolor emby-select">
+                            <option value="false">Sur une ligne</option>
+                            <option value="true">Empilés</option>
+                        </select>
+                        <div class="fieldDescription">Les vues apparaissent en premier, suivies des favoris. Les favoris restent masqués lorsque leur compteur est à zéro.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeScale">Taille des icônes et compteurs (px)</label>
+                        <input id="BadgeScale" type="number" is="emby-input" min="12" max="28" step="1" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetX">Décalage horizontal depuis le coin (px)</label>
+                        <input id="BadgeInsetX" type="number" is="emby-input" min="0" max="32" step="1" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetY">Décalage vertical depuis le coin (px)</label>
+                        <input id="BadgeInsetY" type="number" is="emby-input" min="0" max="32" step="1" />
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="BackgroundOpacity">Opacité du fond des badges (%)</label>
+                        <input id="BackgroundOpacity" type="number" is="emby-input" min="0" max="90" step="5" />
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="RefreshIntervalHours">Réconciliation complète</label>
+                        <select id="RefreshIntervalHours" is="emby-select" class="emby-select-withcolor emby-select">
+                            <option value="1">Toutes les heures</option>
+                            <option value="6">Toutes les 6 heures</option>
+                        </select>
+                        <div class="fieldDescription">Choisir une heure si la tâche complète dure moins de cinq minutes; sinon préférer six heures. Elle reste lançable manuellement dans les tâches planifiées.</div>
+                    </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Enregistrer</span></button>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            const CommunityRatingConfig = { pluginUniqueId: '8b270d4b-75f2-4ad3-9be6-1c18684945c9' };
+            const page = document.querySelector('#CommunityRatingConfigPage');
+            const form = document.querySelector('#CommunityRatingConfigForm');
+            const ids = ['EnableBadges', 'ExcludedUserNames', 'EnableAdminTooltips', 'StackCardBadges', 'BadgeScale', 'BadgeInsetX', 'BadgeInsetY', 'BackgroundOpacity', 'RefreshIntervalHours'];
+            page.addEventListener('pageshow', function () {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(CommunityRatingConfig.pluginUniqueId).then(function (config) {
+                    document.querySelector('#EnableBadges').checked = config.EnableBadges !== false;
+                    document.querySelector('#ExcludedUserNames').value = config.ExcludedUserNames || '';
+                    document.querySelector('#EnableAdminTooltips').checked = config.EnableAdminTooltips === true;
+                    document.querySelector('#StackCardBadges').value = config.StackCardBadges === true ? 'true' : 'false';
+                    document.querySelector('#BadgeScale').value = config.BadgeScale || 16;
+                    document.querySelector('#BadgeInsetX').value = Number.isFinite(config.BadgeInsetX) ? config.BadgeInsetX : 8;
+                    document.querySelector('#BadgeInsetY').value = Number.isFinite(config.BadgeInsetY) ? config.BadgeInsetY : 8;
+                    document.querySelector('#BackgroundOpacity').value = Number.isFinite(config.BackgroundOpacity) ? config.BackgroundOpacity : 45;
+                    document.querySelector('#RefreshIntervalHours').value = config.RefreshIntervalHours === 1 ? '1' : '6';
+                    Dashboard.hideLoadingMsg();
+                }).catch(function () { Dashboard.hideLoadingMsg(); });
+            });
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(CommunityRatingConfig.pluginUniqueId).then(function (config) {
+                    config.EnableBadges = document.querySelector('#EnableBadges').checked;
+                    config.ExcludedUserNames = document.querySelector('#ExcludedUserNames').value;
+                    config.EnableAdminTooltips = document.querySelector('#EnableAdminTooltips').checked;
+                    config.StackCardBadges = document.querySelector('#StackCardBadges').value === 'true';
+                    config.BadgeScale = Math.min(28, Math.max(12, Number(document.querySelector('#BadgeScale').value) || 16));
+                    config.BadgeInsetX = Math.min(32, Math.max(0, Number(document.querySelector('#BadgeInsetX').value) || 0));
+                    config.BadgeInsetY = Math.min(32, Math.max(0, Number(document.querySelector('#BadgeInsetY').value) || 0));
+                    config.BackgroundOpacity = Math.min(90, Math.max(0, Number(document.querySelector('#BackgroundOpacity').value) || 0));
+                    config.RefreshIntervalHours = Number(document.querySelector('#RefreshIntervalHours').value) === 1 ? 1 : 6;
+                    return ApiClient.updatePluginConfiguration(CommunityRatingConfig.pluginUniqueId, config);
+                }).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                }).catch(function () { Dashboard.hideLoadingMsg(); });
+                return false;
+            });
+        </script>
+    </div>
+</body>
+</html>
