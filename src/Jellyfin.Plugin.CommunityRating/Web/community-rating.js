@@ -13,9 +13,10 @@
     let refreshQueued = false;
     let scanning = false;
     let cacheRevision = 0;
-    const customSortStates = new WeakMap();
+    const customSortStates = new Map();
+    let lastSortContext = null;
+    let pendingSortSelection = null;
     const sortModeIds = { views: 'CommunityRatingViews', likes: 'CommunityRatingLikes' };
-    let originalGetItems = null;
 
     const styles = `
         .cr-badge-stack{display:flex;flex-direction:var(--cr-card-direction,row);align-items:flex-start;gap:4px;position:absolute;z-index:5;top:var(--cr-inset-y,8px);left:var(--cr-inset-x,8px);pointer-events:none}
@@ -35,11 +36,32 @@
         return base + (base.includes('?') ? '&' : '?') + 'ids=' + ids.map(encodeURIComponent).join('&ids=');
     }
 
+    function communitySortMode(sortBy) {
+        const first = (Array.isArray(sortBy) ? sortBy.join(',') : String(sortBy || '')).split(',')[0];
+        return first === sortModeIds.views ? 'views' : first === sortModeIds.likes ? 'likes' : null;
+    }
+
     function querySignature(query) {
         return JSON.stringify(Object.keys(query)
             .filter(key => !['StartIndex', 'Limit', 'SortBy', 'SortOrder'].includes(key))
             .sort()
             .map(key => [key, query[key]]));
+    }
+
+    function supportedItemTypes(query) {
+        const types = (Array.isArray(query?.IncludeItemTypes) ? query.IncludeItemTypes
+            : String(query?.IncludeItemTypes || '').split(',')).filter(Boolean);
+        return types.some(type => ['Movie', 'Series', 'Episode'].includes(type));
+    }
+
+    function supportedSortPage() {
+        if (lastSortContext?.route === location.hash && supportedItemTypes(lastSortContext.query)) return true;
+        const route = location.hash.split('?')[0];
+        if (/^#\/(movies|tv|tvshows|shows)(?:\.html)?$/.test(route)) return true;
+        const type = new URLSearchParams(location.hash.split('?')[1] || location.search).get('type');
+        if (type) return ['Movie', 'Series', 'Episode', 'favoritemovies'].includes(type);
+        return Array.from(document.querySelectorAll('.page:not(.hide) .card[data-type], .page:not(.hide) .listItem[data-type]'))
+            .some(item => ['Movie', 'Series', 'Episode'].includes(item.getAttribute('data-type')));
     }
 
     async function getCommunityCounts(items) {
@@ -55,7 +77,7 @@
     function orderCommunityItems(state, sortOrder) {
         const key = state.mode === 'views' ? 'ViewCount' : 'LikeCount';
         const direction = sortOrder === 'Ascending' ? 1 : -1;
-        state.sortedItems = [...state.items].sort((left, right) => {
+        return [...state.items].sort((left, right) => {
             const leftCount = state.counts.get(left.Id.toLowerCase())?.[key] || 0;
             const rightCount = state.counts.get(right.Id.toLowerCase())?.[key] || 0;
             const countOrder = (leftCount - rightCount) * direction;
@@ -64,140 +86,176 @@
         });
     }
 
-    async function prepareCommunitySort(query, state) {
-        const signature = querySignature(query);
-        if (state.signature === signature && state.revision === cacheRevision && state.sortedItems) return;
+    function prepareCommunitySort(query, state, userId, client, getItems) {
         if (state.pending) return state.pending;
-
         const request = {
             ...query,
-            SortBy: state.backendSortBy,
+            SortBy: 'SortName',
             SortOrder: 'Ascending',
             StartIndex: 0,
             Limit: 500,
             EnableTotalRecordCount: true
         };
-        const revision = cacheRevision;
         state.pending = (async () => {
             const allItems = [];
             let total = 0;
             do {
-                const result = await originalGetItems.call(ApiClient, ApiClient.getCurrentUserId(), request);
+                const result = await getItems.call(client, userId, request);
                 const page = result.Items || [];
                 if (page.length === 0) break;
                 allItems.push(...page);
-                total = result.TotalRecordCount || allItems.length;
+                total = result.TotalRecordCount ?? allItems.length;
                 request.StartIndex = allItems.length;
             } while (allItems.length < total);
-
             state.items = allItems;
-            state.totalCount = total;
+            state.totalCount = allItems.length;
             state.counts = await getCommunityCounts(allItems);
-            state.signature = signature;
-            state.revision = revision;
-            orderCommunityItems(state, query.SortOrder);
-        })().finally(() => { state.pending = null; });
+        })();
         return state.pending;
     }
 
+    function setDescending(dialog) {
+        const select = dialog?.querySelector('.selectSortOrder');
+        if (select) select.value = 'Descending';
+        dialog?.querySelectorAll('.menuSortOrder').forEach(input => { input.checked = input.value === 'Descending'; });
+    }
+
     function installCommunitySortSupport() {
-        const libraryBrowser = window.LibraryBrowser;
-        if (!libraryBrowser || libraryBrowser.__communityRatingSortInstalled || !ApiClient.getItems) return;
-        libraryBrowser.__communityRatingSortInstalled = true;
-        originalGetItems = ApiClient.getItems;
-
-        ApiClient.getItems = function (userId, query) {
-            const state = query && customSortStates.get(query);
-            if (!state) return originalGetItems.call(this, userId, query);
-            return prepareCommunitySort(query, state).then(() => {
-                const start = Math.max(0, query.StartIndex || 0);
-                const limit = query.Limit > 0 ? query.Limit : state.totalCount;
-                return {
-                    Items: state.sortedItems.slice(start, start + limit),
-                    TotalRecordCount: state.totalCount,
-                    StartIndex: start
-                };
-            });
-        };
-
-        const originalShowSortMenu = libraryBrowser.showSortMenu;
-        libraryBrowser.showSortMenu = function (menuOptions) {
-            if (!menuOptions?.query || !Array.isArray(menuOptions.items)) {
-                return originalShowSortMenu.apply(this, arguments);
-            }
-
-            const query = menuOptions.query;
-            const itemTypes = String(query.IncludeItemTypes || '').split(',').filter(Boolean);
-            if (itemTypes.length && !itemTypes.some(type => ['Movie', 'Series', 'Episode'].includes(type))) {
-                return originalShowSortMenu.apply(this, arguments);
-            }
-            let state = customSortStates.get(query);
-            const backendSortBy = state?.backendSortBy || query.SortBy || 'SortName';
-            if (!menuOptions.items.some(item => item.id === sortModeIds.views)) {
-                menuOptions.items.push({ name: 'Vus par les membres', id: sortModeIds.views });
-                menuOptions.items.push({ name: 'Aimés par les membres', id: sortModeIds.likes });
-            }
-
-            if (state) {
-                query.SortBy = sortModeIds[state.mode];
-                const selectionObserver = new MutationObserver(() => {
-                    const selectedOption = document.querySelector(`input.menuSortBy[value="${sortModeIds[state.mode]}"]`);
-                    if (selectedOption) {
-                        query.SortBy = state.backendSortBy;
-                        selectionObserver.disconnect();
-                    }
+        // Install independently of LibraryBrowser: generic lists use a different menu
+        // and recreate their query object for every page.
+        if (ApiClient.getItems && !ApiClient.getItems.__communityRatingSortInstalled) {
+            const getItems = ApiClient.getItems;
+            const wrapped = function (userId, query) {
+                if (!query) return getItems.apply(this, arguments);
+                const mode = communitySortMode(query.SortBy);
+                if (supportedItemTypes(query) || mode) lastSortContext = { route: location.hash, query };
+                if (!mode) return getItems.apply(this, arguments);
+                if (pendingSortSelection?.route === location.hash && pendingSortSelection.mode === mode) {
+                    query.SortOrder = 'Descending';
+                    pendingSortSelection = null;
+                }
+                const snapshot = { ...query };
+                const cacheKey = JSON.stringify([ApiClient.getUrl('Items'), userId, mode, querySignature(snapshot), cacheRevision]);
+                let state = customSortStates.get(cacheKey);
+                if (!state) {
+                    state = { mode, items: [], counts: new Map(), totalCount: 0, pending: null };
+                    if (customSortStates.size >= 8) customSortStates.delete(customSortStates.keys().next().value);
+                    customSortStates.set(cacheKey, state);
+                }
+                return prepareCommunitySort(snapshot, state, userId, this, getItems).then(() => {
+                    const start = Math.max(0, Number(snapshot.StartIndex) || 0);
+                    const limit = snapshot.Limit > 0 ? Number(snapshot.Limit) : state.totalCount;
+                    return {
+                        Items: orderCommunityItems(state, snapshot.SortOrder).slice(start, start + limit),
+                        TotalRecordCount: state.totalCount,
+                        StartIndex: start
+                    };
+                }).catch(error => {
+                    customSortStates.delete(cacheKey);
+                    throw error;
                 });
-                selectionObserver.observe(document.body, { childList: true, subtree: true });
-            }
+            };
+            wrapped.__communityRatingSortInstalled = true;
+            ApiClient.getItems = wrapped;
+        }
 
+        const libraryBrowser = window.LibraryBrowser;
+        if (!libraryBrowser || libraryBrowser.__communityRatingSortInstalled || typeof libraryBrowser.showSortMenu !== 'function') return;
+        const showSortMenu = libraryBrowser.showSortMenu;
+        libraryBrowser.showSortMenu = function (menuOptions) {
+            if (!menuOptions?.query || !Array.isArray(menuOptions.items)
+                || (menuOptions.query.IncludeItemTypes ? !supportedItemTypes(menuOptions.query) : !supportedSortPage())) {
+                return showSortMenu.apply(this, arguments);
+            }
+            const query = menuOptions.query;
+            lastSortContext = { route: location.hash, query };
+            for (const [mode, name] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
+                if (!menuOptions.items.some(item => item.id === sortModeIds[mode])) {
+                    menuOptions.items.push({ name, id: sortModeIds[mode] });
+                }
+            }
+            let previousMode = communitySortMode(query.SortBy);
             const callback = menuOptions.callback;
             menuOptions.callback = function () {
-                const selectedMode = query.SortBy === sortModeIds.views ? 'views'
-                    : query.SortBy === sortModeIds.likes ? 'likes'
-                        : null;
-                state = customSortStates.get(query);
-
-                if (selectedMode) {
-                    const isNewMode = !state || state.mode !== selectedMode;
-                    state = state || { backendSortBy, items: [], counts: new Map(), signature: null, pending: null, totalCount: 0 };
-                    state.mode = selectedMode;
-                    state.backendSortBy = backendSortBy;
-                    customSortStates.set(query, state);
-                    query.SortBy = state.backendSortBy;
-                    query.StartIndex = 0;
-                    if (isNewMode) {
-                        query.SortOrder = 'Descending';
-                        const descending = document.querySelector('.formDialog .menuSortOrder[value="Descending"]');
-                        const ascending = document.querySelector('.formDialog .menuSortOrder[value="Ascending"]');
-                        if (descending) descending.checked = true;
-                        if (ascending) ascending.checked = false;
-                    }
-                    prepareCommunitySort(query, state)
-                        .then(() => {
-                            orderCommunityItems(state, query.SortOrder);
-                            callback?.call(this);
-                        })
-                        .catch(error => {
-                            customSortStates.delete(query);
-                            query.SortBy = backendSortBy;
-                            console.warn('Could not sort this list by member activity.', error);
-                            callback?.call(this);
-                        });
-                    return;
+                const mode = communitySortMode(query.SortBy);
+                if (mode && mode !== previousMode) {
+                    query.SortOrder = 'Descending';
+                    setDescending(document.querySelector('.formDialog'));
                 }
-
-                if (state && query.SortBy === state.backendSortBy) {
-                    orderCommunityItems(state, query.SortOrder);
-                    query.StartIndex = 0;
-                    callback?.call(this);
-                    return;
-                }
-
-                if (state) customSortStates.delete(query);
-                callback?.call(this);
+                previousMode = mode;
+                return callback?.apply(this, arguments);
             };
-            return originalShowSortMenu.apply(this, arguments);
+            return showSortMenu.apply(this, arguments);
         };
+        libraryBrowser.__communityRatingSortInstalled = true;
+    }
+
+    function extendSortMenus() {
+        if (!supportedSortPage()) return;
+        // The select menu persists its values and creates a fresh API query later.
+        document.querySelectorAll('.formDialog .selectSortBy').forEach(select => {
+            if (select.dataset.crSortExtended) return;
+            select.dataset.crSortExtended = 'true';
+            const selected = select.value || (lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '');
+            for (const [mode, label] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
+                if (select.querySelector('option[value="' + sortModeIds[mode] + '"]')) continue;
+                const option = document.createElement('option');
+                option.value = sortModeIds[mode];
+                option.textContent = label;
+                select.appendChild(option);
+            }
+            if (communitySortMode(selected)) select.value = selected;
+            let previousMode = communitySortMode(select.value);
+            select.addEventListener('change', () => {
+                const mode = communitySortMode(select.value);
+                if (mode && mode !== previousMode) setDescending(select.closest('.formDialog'));
+                previousMode = mode;
+            });
+        });
+
+        // A DOM fallback also covers radio menus loaded before LibraryBrowser is
+        // available globally. Native radio handlers keep saving and refreshing.
+        document.querySelectorAll('.formDialog').forEach(dialog => {
+            const native = dialog.querySelector('input.menuSortBy');
+            if (!native || dialog.querySelector('input.menuSortBy[value="' + sortModeIds.views + '"]')) return;
+            const parent = native.closest('label')?.parentElement;
+            if (!parent) return;
+            const selected = lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '';
+            for (const [mode, title] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
+                const label = document.createElement('label');
+                label.className = 'radio-label-block';
+                const input = document.createElement('input', { is: 'emby-radio' });
+                input.type = 'radio';
+                input.name = native.name;
+                input.className = 'menuSortBy';
+                input.value = sortModeIds[mode];
+                input.setAttribute('is', 'emby-radio');
+                input.dataset.id = input.value;
+                input.checked = communitySortMode(selected) === mode;
+                input.addEventListener('change', () => {
+                    if (!input.checked) return;
+                    if (lastSortContext?.route === location.hash) lastSortContext.query.SortOrder = 'Descending';
+                    pendingSortSelection = { route: location.hash, mode };
+                    setDescending(dialog);
+                    const originalValue = native.value;
+                    // Reuse the existing native handler with the new sort key.
+                    native.value = input.value;
+                    native.checked = true;
+                    try {
+                        native.dispatchEvent(new Event('change', { bubbles: true }));
+                    } finally {
+                        native.value = originalValue;
+                        native.checked = false;
+                        input.checked = true;
+                    }
+                });
+                const text = document.createElement('span');
+                text.textContent = title;
+                label.appendChild(input);
+                label.appendChild(text);
+                parent.appendChild(label);
+            }
+        });
     }
 
     function currentUserIsAdmin() {
@@ -256,8 +314,9 @@
     }
 
     async function scan() {
-        if (scanning) return;
         installCommunitySortSupport();
+        extendSortMenus();
+        if (scanning) return;
         ensureStyle();
         const targets = collectTargets();
         if (!targets.length) return;
@@ -391,6 +450,7 @@
 
     function invalidateCounts() {
         cacheRevision++;
+        customSortStates.clear();
         cache.clear();
         tooltipCache.clear();
         hideTooltip();
@@ -403,6 +463,7 @@
     window.addEventListener('popstate', queueScan);
     window.addEventListener('scroll', queueScan, { passive: true });
     document.addEventListener('click', event => {
+        if (event.target.closest('.btnSort')) installCommunitySortSupport();
         if (event.target.closest('.buttonUserData,.btnUserData,.itemAction,.cardOverlayButton')) {
             window.setTimeout(() => {
                 invalidateCounts();

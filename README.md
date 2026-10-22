@@ -18,6 +18,8 @@
 
 The server updates its cache when markers change. Open web pages refresh counters every 30 seconds and shortly after local marker actions. Community sorting fetches the full filtered list before applying pagination, so the first sort can take longer on large libraries.
 
+Use the **A–Z / Sort** button in a movie, series, or episode list to find the member sorts. Both Jellyfin's radio-button menu and its sort drop-down are supported. The selected sort is preserved by Jellyfin's normal list settings; pages and filters keep applying to the whole sorted result.
+
 ## Installation
 
 Install [JavaScript Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) first. Community Rating registers its bundled script with JavaScript Injector automatically when Jellyfin starts.
@@ -28,7 +30,7 @@ In Jellyfin, open **Dashboard → Plugins → Repositories**, then add the repos
 https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/manifest.json
 ```
 
-Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.0.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.0.0.zip) is also available directly.
+Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.1.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.1.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
 
 Jellyfin must be able to access the manifest and package files on GitHub to install and update the plugin.
 
@@ -62,10 +64,11 @@ Targets Jellyfin **10.11.11** and **.NET 9**. The web interface requires JavaScr
 dotnet restore Jellyfin.Plugin.CommunityRating.sln
 dotnet build Jellyfin.Plugin.CommunityRating.sln -c Release --no-restore -m:1
 dotnet test Jellyfin.Plugin.CommunityRating.sln -c Release --no-build --no-restore -m:1
-node tests/web/community-rating.test.cjs
+npm ci --ignore-scripts
+npm test
 ```
 
-The web tests use Node.js 22 and a local DOM fixture; they do not require a running Jellyfin server. CI builds and runs both test suites on pushes to `main` and pull requests. Publishing a GitHub release verifies the version tag, produces the installable ZIP, computes its checksum, and updates `manifest.json`.
+The web tests use Node.js 22, including jsdom fixtures for Jellyfin's native sort menus; they do not require a running Jellyfin server. CI builds and runs both test suites on pushes to `main` and pull requests. Publishing a GitHub release verifies the version tag, produces the installable ZIP, computes its checksum, and updates `manifest.json`.
 
 ## License
 

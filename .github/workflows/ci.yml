@@ -22,4 +22,5 @@ jobs:
       - run: dotnet restore Jellyfin.Plugin.CommunityRating.sln
       - run: dotnet build Jellyfin.Plugin.CommunityRating.sln -c Release --no-restore -m:1
       - run: dotnet test Jellyfin.Plugin.CommunityRating.sln -c Release --no-build --no-restore -m:1
-      - run: node tests/web/community-rating.test.cjs
+      - run: npm ci --ignore-scripts
+      - run: npm test

@@ -29,7 +29,9 @@ jobs:
         with:
           node-version: 22
       - name: Test web renderer
-        run: node tests/web/community-rating.test.cjs
+        run: |
+          npm ci --ignore-scripts
+          npm test
       - name: Check release tag matches plugin version
         env:
           TAG: ${{ github.event.release.tag_name }}

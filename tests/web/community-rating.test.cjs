@@ -42,7 +42,8 @@ function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3,
         getElementById: id => head.children.find(node => node.id === id),
         querySelector: selector => detail && selector === '.itemDetailPage' ? detailPage : null,
         querySelectorAll: selector => selector === '.card[data-id]' ? cardNodes
-            : cardNodes.flatMap(card => card.children.filter(child => ['cr-badge-stack', 'cr-details-stack'].includes(child.className))),
+            : selector === '.cr-badge-stack,.cr-details-stack'
+                ? cardNodes.flatMap(card => card.children.filter(child => ['cr-badge-stack', 'cr-details-stack'].includes(child.className))) : [],
         addEventListener: (name, callback) => { events[name] = callback; }
     };
     let menu;

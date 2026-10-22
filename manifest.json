@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.1.1.0",
+        "changelog": "Fix member sort options in both Jellyfin sort menus, including late-loaded menus, folder lists, pagination, filters, and saved selections.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.1.0.zip",
+        "checksum": "0ee7dfc5b4aa7897b073be67941012ec",
+        "timestamp": "2026-10-22T05:32:33Z"
+      },
+      {
         "version": "0.1.0.0",
         "changelog": "Initial release: member views and favorites, configurable card layout, library sorting, administrator tooltips, and scheduled reconciliation.",
         "targetAbi": "10.11.11.0",
