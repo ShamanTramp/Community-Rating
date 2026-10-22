@@ -3,7 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.CommunityRating</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.CommunityRating</AssemblyName>
-    <Version>0.1.4.0</Version>
+    <Version>0.1.5.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

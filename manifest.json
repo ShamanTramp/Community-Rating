@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.1.5.0",
+        "changelog": "Fix the large gap above detail counters caused by float clearing; keep the counters directly below the header and centered within the information column.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.5.0.zip",
+        "checksum": "f86fd083048fb718ecf2d0a2eb1832f3",
+        "timestamp": "2026-10-22T15:38:18Z"
+      },
+      {
         "version": "0.1.4.0",
         "changelog": "Anchor detail counters at the top of the media content column directly below the preceding header, remove the extra top gap, and retain configurable sizing.",
         "targetAbi": "10.11.11.0",

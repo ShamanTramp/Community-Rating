@@ -127,6 +127,7 @@ test('detail counters center inside the description column and share the configu
     assert.equal(f.document.querySelector('.detailRibbon').nextElementSibling, column);
     assert.equal(f.window.getComputedStyle(column).paddingTop, '0px');
     assert.equal(f.window.getComputedStyle(row).marginTop, '0px');
+    assert.equal(f.window.getComputedStyle(row).clear, 'none');
     assert.equal(f.window.getComputedStyle(row).order, '-1');
     assert.equal(ratings.parentElement.className, 'infoWrapper');
     assert.equal(ratings.textContent, 'IMDb 7.9Rotten Tomatoes 88%');
