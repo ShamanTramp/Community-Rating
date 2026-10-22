@@ -15,7 +15,7 @@ public sealed class CommunityApiContractTests
     public void PublicResponseCannotSerializeMemberNames()
     {
         var stats = new CommunityItemStats(Guid.NewGuid(), 2, 1, ["PrivateAlpha", "PrivateBeta"], ["PrivateAlpha"]);
-        var response = new CommunityStatsResponse([CommunityItemCounts.FromStats(stats)], new(true, 16, 8, 8, 45, true, false));
+        var response = new CommunityStatsResponse([CommunityItemCounts.FromStats(stats)], new(true, 16, 3, 8, 45, true, false, 1.25));
         var json = JsonSerializer.Serialize(response);
 
         using var document = JsonDocument.Parse(json);
@@ -23,6 +23,7 @@ public sealed class CommunityApiContractTests
         Assert.Equal(2, item.GetProperty("ViewCount").GetInt32());
         Assert.Equal(1, item.GetProperty("LikeCount").GetInt32());
         Assert.Equal(3, item.EnumerateObject().Count());
+        Assert.Equal(1.25, document.RootElement.GetProperty("Options").GetProperty("DetailScaleFactor").GetDouble());
         Assert.DoesNotContain("Private", json);
         Assert.DoesNotContain("ViewedBy", json);
         Assert.DoesNotContain("LikedBy", json);
@@ -60,5 +61,6 @@ public sealed class CommunityApiContractTests
         Assert.False(config.EnableAdminTooltips);
         Assert.Equal(3, config.BadgeInsetX);
         Assert.Equal(8, config.BadgeInsetY);
+        Assert.Equal(1d, config.DetailScaleFactor);
     }
 }

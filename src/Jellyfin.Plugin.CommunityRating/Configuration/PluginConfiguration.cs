@@ -20,6 +20,9 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the badge scale in CSS pixels.</summary>
     public int BadgeScale { get; set; } = 16;
 
+    /// <summary>Gets or sets the detail counter size multiplier (1 to 3).</summary>
+    public double DetailScaleFactor { get; set; } = 1;
+
     /// <summary>Gets or sets the horizontal inset from the upper-left corner.</summary>
     public int BadgeInsetX { get; set; } = 3;
 

@@ -87,5 +87,6 @@ public sealed class CommunityRatingController(CommunityStatsService statsService
         Math.Clamp(config.BadgeInsetY, 0, 32),
         Math.Clamp(config.BackgroundOpacity, 0, 90),
         config.EnableAdminTooltips,
-        config.StackCardBadges);
+        config.StackCardBadges,
+        double.IsFinite(config.DetailScaleFactor) ? Math.Clamp(config.DetailScaleFactor, 1, 3) : 1);
 }

@@ -11,7 +11,7 @@
 - Counts favorites on the movie, episode, or series itself.
 - Ignores disabled accounts and user names listed in the exclusions.
 - Shows white view and favorite icons in the upper-left corner of media cards, either on one line or stacked vertically. Views always appear first, including zero; favorites are hidden when their count is zero.
-- Places both counters on a separate centered row below the existing rating information on detail pages, including zero favorites. Detail counters are 25% larger than card counters (20 px by default).
+- Places both counters on a separate row centered within the media content column on detail pages, including zero favorites. The row follows the description column's width and poster offsets. Detail size follows the configured base counter size multiplied by an optional enlargement factor; the default factor of 1 matches cards (16 px by default).
 - Adds **Viewed by members** and **Liked by members** to supported library sort menus (**Vus par les membres** and **Aimés par les membres** in French). Both default to descending order.
 - Shows a tooltip above each counter for everyone, on hover or keyboard focus: **Viewed by members** for views and **Liked by members** for favorites (**Vu par les membres** and **Aimé par les membres** in French). Press Escape to dismiss it.
 - Administrators can optionally see member names below the tooltip label, with one name per line. Name lists are disabled by default; the names endpoint requires administrator access. Label tooltips remain available regardless of this setting.
@@ -33,7 +33,7 @@ In Jellyfin, open **Dashboard → Plugins → Repositories**, then add the repos
 https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/manifest.json
 ```
 
-Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.2.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.2.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
+Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.3.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.3.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
 
 Jellyfin must be able to access the manifest and package files on GitHub to install and update the plugin.
 
@@ -47,7 +47,8 @@ Open **Dashboard → Plugins → Community Rating**:
 | Excluded accounts | Empty | Jellyfin user names separated by commas. Spaces around names and letter case are ignored. Disabled accounts are always excluded. |
 | Administrator tooltips | Disabled | Adds the included member names to administrators' tooltips. Label tooltips remain available to everyone. Names are never included in the public counter response. |
 | Card counter layout | One line | Choose one line or vertically stacked counters. Views come first, favorites second. |
-| Icon and counter size | 16 px | Adjusts the card size from 12 to 28 px; detail counters are 25% larger. |
+| Icon and counter size | 16 px | Sets the base size from 12 to 28 px, used by both cards and details. |
+| Detail enlargement factor | 1 | Multiplies the base size on detail pages only, from 1 to 3. For example, a 16 px base with a factor of 1.25 gives 20 px detail counters. |
 | Horizontal inset | 3 px | Sets the distance from the left edge of a card, from 0 to 32 px. |
 | Vertical inset | 8 px | Sets the distance from the top edge of a card, from 0 to 32 px. |
 | Background opacity | 45% | Adjusts the counter background from 0% to 90%. |

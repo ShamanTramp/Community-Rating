@@ -38,7 +38,12 @@
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="BadgeScale" data-cr-i18n="badgeScale">Icon and counter size (px)</label>
                         <input id="BadgeScale" type="number" is="emby-input" min="12" max="28" step="1" />
-                        <div class="fieldDescription" data-cr-i18n="scaleDescription">Counters are 25% larger on detail pages.</div>
+                        <div class="fieldDescription" data-cr-i18n="scaleDescription">Base size for cards and detail pages.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="DetailScaleFactor" data-cr-i18n="detailScaleFactor">Detail page enlargement factor</label>
+                        <input id="DetailScaleFactor" type="number" is="emby-input" min="1" max="3" step="0.05" />
+                        <div class="fieldDescription" data-cr-i18n="detailScaleDescription">Multiplies the base size on detail pages only. 1 uses the same size as cards.</div>
                     </div>
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="BadgeInsetX" data-cr-i18n="insetX">Horizontal inset from the corner (px)</label>
@@ -80,7 +85,9 @@
                     "layoutStacked": "Stacked",
                     "layoutDescription": "Views appear first, followed by favorites. Favorites remain hidden when their count is zero.",
                     "badgeScale": "Icon and counter size (px)",
-                    "scaleDescription": "Counters are 25% larger on detail pages.",
+                    "scaleDescription": "Base size for cards and detail pages.",
+                    "detailScaleFactor": "Detail page enlargement factor",
+                    "detailScaleDescription": "Multiplies the base size on detail pages only. 1 uses the same size as cards.",
                     "insetX": "Horizontal inset from the corner (px)",
                     "insetY": "Vertical inset from the corner (px)",
                     "backgroundOpacity": "Counter background opacity (%)",
@@ -101,7 +108,9 @@
                     "layoutStacked": "Empilés",
                     "layoutDescription": "Les vues apparaissent en premier, suivies des favoris. Les favoris restent masqués lorsque leur compteur est à zéro.",
                     "badgeScale": "Taille des icônes et compteurs (px)",
-                    "scaleDescription": "Les compteurs sont 25 % plus grands sur la page détail.",
+                    "scaleDescription": "Taille de base pour les vignettes et la page détail.",
+                    "detailScaleFactor": "Coefficient d’agrandissement sur la page détail",
+                    "detailScaleDescription": "Multiplie la taille de base uniquement sur la page détail. 1 conserve la même taille que les vignettes.",
                     "insetX": "Décalage horizontal depuis le coin (px)",
                     "insetY": "Décalage vertical depuis le coin (px)",
                     "backgroundOpacity": "Opacité du fond des badges (%)",
@@ -134,6 +143,7 @@
                     document.querySelector('#EnableAdminTooltips').checked = config.EnableAdminTooltips === true;
                     document.querySelector('#StackCardBadges').value = config.StackCardBadges === true ? 'true' : 'false';
                     document.querySelector('#BadgeScale').value = config.BadgeScale || 16;
+                    document.querySelector('#DetailScaleFactor').value = Number.isFinite(config.DetailScaleFactor) ? Math.min(3, Math.max(1, config.DetailScaleFactor)) : 1;
                     document.querySelector('#BadgeInsetX').value = Number.isFinite(config.BadgeInsetX) ? config.BadgeInsetX : 3;
                     document.querySelector('#BadgeInsetY').value = Number.isFinite(config.BadgeInsetY) ? config.BadgeInsetY : 8;
                     document.querySelector('#BackgroundOpacity').value = Number.isFinite(config.BackgroundOpacity) ? config.BackgroundOpacity : 45;
@@ -150,6 +160,8 @@
                     config.EnableAdminTooltips = document.querySelector('#EnableAdminTooltips').checked;
                     config.StackCardBadges = document.querySelector('#StackCardBadges').value === 'true';
                     config.BadgeScale = Math.min(28, Math.max(12, Number(document.querySelector('#BadgeScale').value) || 16));
+                    const detailFactor = Number(document.querySelector('#DetailScaleFactor').value);
+                    config.DetailScaleFactor = Number.isFinite(detailFactor) ? Math.min(3, Math.max(1, detailFactor)) : 1;
                     config.BadgeInsetX = Math.min(32, Math.max(0, Number(document.querySelector('#BadgeInsetX').value) || 0));
                     config.BadgeInsetY = Math.min(32, Math.max(0, Number(document.querySelector('#BadgeInsetY').value) || 0));
                     config.BackgroundOpacity = Math.min(90, Math.max(0, Number(document.querySelector('#BackgroundOpacity').value) || 0));

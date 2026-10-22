@@ -23,4 +23,5 @@ public sealed record CommunityDisplayOptions(
     int BadgeInsetY,
     int BackgroundOpacity,
     bool AdminTooltipsEnabled,
-    bool StackCardBadges);
+    bool StackCardBadges,
+    double DetailScaleFactor = 1);

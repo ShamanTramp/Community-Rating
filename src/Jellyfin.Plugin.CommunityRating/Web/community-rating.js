@@ -42,8 +42,8 @@
         .cr-badge{align-items:center;display:inline-flex;gap:.25em;padding:.12em .4em;border-radius:999px;background:rgba(0,0,0,var(--cr-bg-opacity,.45));color:#fff;font-size:var(--cr-size,16px);font-weight:600;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.8);white-space:nowrap;pointer-events:auto;cursor:default}
         .cr-badge svg{width:1em;height:1em;flex:none;fill:currentColor}
         .cr-badge:focus-visible{outline:2px solid var(--accent-color,#00a4dc);outline-offset:2px}
-        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.65em;flex:0 0 100%;width:100%;box-sizing:border-box;clear:both;margin:.65em 0 .5em}
-        .cr-details-stack .cr-badge{font-size:var(--cr-detail-size,20px);padding:.18em .55em}
+        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.65em;flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box;clear:both;margin:.65em 0 .5em}
+        .cr-details-stack .cr-badge{font-size:var(--cr-detail-size,var(--cr-size,16px))}
         .cr-tooltip{position:fixed;z-index:99999;max-width:min(320px,80vw);max-height:40vh;overflow:auto;padding:.65em .85em;border:1px solid var(--card-bracket-color,rgba(255,255,255,.16));border-radius:.55em;background:var(--card-background-color,rgba(25,25,25,.96));color:var(--primary-text-color,#fff);box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:.9rem;line-height:1.5;white-space:pre-line;pointer-events:none}
         .cr-tooltip[hidden]{display:none}
     `;
@@ -390,8 +390,9 @@
     function applyOptions() {
         if (!options) return;
         const size = Number.isFinite(options.BadgeScale) ? options.BadgeScale : 16;
+        const factor = Number.isFinite(options.DetailScaleFactor) ? Math.min(3, Math.max(1, options.DetailScaleFactor)) : 1;
         document.documentElement.style.setProperty('--cr-size', `${size}px`);
-        document.documentElement.style.setProperty('--cr-detail-size', `${Math.round(size * 1.25)}px`);
+        document.documentElement.style.setProperty('--cr-detail-size', `${Math.round(size * factor * 100) / 100}px`);
         document.documentElement.style.setProperty('--cr-inset-x', `${Number.isFinite(options.BadgeInsetX) ? options.BadgeInsetX : 3}px`);
         document.documentElement.style.setProperty('--cr-inset-y', `${Number.isFinite(options.BadgeInsetY) ? options.BadgeInsetY : 8}px`);
         document.documentElement.style.setProperty('--cr-bg-opacity', String(options.BackgroundOpacity / 100));
@@ -415,12 +416,19 @@
     }
 
     function render(target, item) {
+        const primaryContent = target.detail && target.element.querySelector('.detailPagePrimaryContent');
+        const contentColumn = primaryContent && (primaryContent.querySelector('.detailSection') || primaryContent);
+        const ratingBlock = target.detail && (target.element.querySelector('.itemMiscInfo-secondary') || target.element.querySelector('.itemMiscInfo'));
         const host = target.detail
-            ? (target.element.querySelector('.itemMiscInfo') || target.element.querySelector('.detailPagePrimaryContainer') || target.element)
+            ? (contentColumn || target.element.querySelector('.infoWrapper') || ratingBlock?.parentElement)
             : (target.element.querySelector('.cardScalable') || target.element.querySelector('.cardImageContainer') || target.element);
+        if (!host) return;
         const existing = target.element.querySelector(target.detail ? '.cr-details-stack' : '.cr-badge-stack');
         const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, options.AdminTooltipsEnabled, isAdmin, uiLanguage()]);
-        if (existing?.dataset.crSignature === signature) return;
+        if (existing?.dataset.crSignature === signature) {
+            if (target.detail && contentColumn && existing.parentElement !== host) host.prepend(existing);
+            return;
+        }
         if (existing) {
             if (tooltipBadge?.dataset.crItemId === item.ItemId) hideTooltip();
             existing.remove();
@@ -436,8 +444,10 @@
         if (target.detail || item.LikeCount > 0) stack.appendChild(makeBadge('like', item.LikeCount, item.ItemId, 'LikedBy'));
 
         if (target.detail) {
-            const ratingBlock = target.element.querySelector('.itemMiscInfo-secondary') || target.element.querySelector('.itemMiscInfo');
-            if (ratingBlock && ratingBlock.parentElement) ratingBlock.insertAdjacentElement('afterend', stack);
+            // Use the description/track-selection column so Jellyfin's own
+            // poster offsets and responsive padding determine the center.
+            if (contentColumn) host.prepend(stack);
+            else if (ratingBlock?.parentElement === host) ratingBlock.insertAdjacentElement('afterend', stack);
             else host.appendChild(stack);
         } else {
             host.appendChild(stack);
@@ -452,7 +462,6 @@
         tooltipElement = document.createElement('div');
         tooltipElement.id = 'communityRatingTooltip';
         tooltipElement.className = 'cr-tooltip';
-        tooltipElement.hidden = true;
         tooltipElement.hidden = true;
         tooltipElement.setAttribute('role', 'tooltip');
         document.body.appendChild(tooltipElement);
