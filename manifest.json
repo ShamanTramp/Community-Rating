@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.1.4.0",
+        "changelog": "Anchor detail counters at the top of the media content column directly below the preceding header, remove the extra top gap, and retain configurable sizing.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.4.0.zip",
+        "checksum": "6842afc4c654742a3195fa3ceb73540d",
+        "timestamp": "2026-10-22T15:18:30Z"
+      },
+      {
         "version": "0.1.3.0",
         "changelog": "Center detail counters within the media information column and bind their size to the base setting with an optional detail enlargement factor (default 1).",
         "targetAbi": "10.11.11.0",

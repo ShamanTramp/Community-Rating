@@ -8,7 +8,7 @@ const configHtml = fs.readFileSync(path.join(__dirname, '../../src/Jellyfin.Plug
 const settle = async () => { for (let index = 0; index < 12; index++) await new Promise(resolve => setImmediate(resolve)); };
 
 function presentation(t, { admin = false, namesEnabled = false, rejectNames = false, language = 'fr', noMembers = false } = {}) {
-    const dom = new JSDOM(`<!doctype html><html lang="${language}"><head></head><body>
+    const dom = new JSDOM(`<!doctype html><html lang="${language}"><head><style>.detailPagePrimaryContent{padding-top:20px}</style></head><body>
         <div class="card" data-id="movie-a"><div class="cardScalable"></div></div>
         <div class="itemDetailPage"><div class="detailPagePrimaryContainer">
         <div class="detailImageContainer">Poster</div>
@@ -118,12 +118,16 @@ test('detail counters center inside the description column and share the configu
     await settle();
     const ratings = f.document.querySelector('.itemMiscInfo-secondary');
     const row = f.document.querySelector('.cr-details-stack');
-    const column = f.document.querySelector('.detailSection');
+    const column = f.document.querySelector('.detailPagePrimaryContent');
     column.style.width = '640px';
     assert.equal(row.parentElement, column);
     assert.equal(column.firstElementChild, row);
     assert.equal(column.querySelector('.overview').textContent, 'Film description');
     assert.equal(f.document.querySelector('.infoWrapper').contains(row), false);
+    assert.equal(f.document.querySelector('.detailRibbon').nextElementSibling, column);
+    assert.equal(f.window.getComputedStyle(column).paddingTop, '0px');
+    assert.equal(f.window.getComputedStyle(row).marginTop, '0px');
+    assert.equal(f.window.getComputedStyle(row).order, '-1');
     assert.equal(ratings.parentElement.className, 'infoWrapper');
     assert.equal(ratings.textContent, 'IMDb 7.9Rotten Tomatoes 88%');
     assert.equal(f.window.getComputedStyle(row).display, 'flex');
@@ -155,7 +159,7 @@ test('detail counters center inside the description column and share the configu
     assert.equal(f.window.getComputedStyle(row).justifyContent, 'center');
 });
 
-test('detail rows follow replacement content columns without duplicating counters', async t => {
+test('detail rows stay above asynchronously added content without duplicating counters', async t => {
     const f = presentation(t);
     await settle();
     const row = f.document.querySelector('.cr-details-stack');
@@ -164,16 +168,29 @@ test('detail rows follow replacement content columns without duplicating counter
     originalColumn.className = 'oldColumn';
     const replacement = f.document.createElement('div');
     replacement.className = 'detailSection';
-    primary.append(replacement);
+    primary.prepend(replacement);
     await settle();
-    assert.equal(row.parentElement, replacement);
-    assert.equal(replacement.firstElementChild, row);
+    assert.equal(row.parentElement, primary);
+    assert.equal(primary.firstElementChild, row);
     replacement.remove();
     await settle();
     const fallback = f.document.querySelector('.cr-details-stack');
     assert.equal(fallback.parentElement, primary);
     assert.equal(primary.firstElementChild, fallback);
     assert.equal(f.document.querySelectorAll('.cr-details-stack').length, 1);
+});
+
+test('disabling counters restores the original spacing of the content column', async t => {
+    const f = presentation(t);
+    await settle();
+    const column = f.document.querySelector('.detailPagePrimaryContent');
+    assert.equal(f.window.getComputedStyle(column).paddingTop, '0px');
+    f.options.Enabled = false;
+    f.intervals[0]();
+    await settle();
+    assert.equal(f.document.querySelector('.cr-details-stack'), null);
+    assert.equal(column.classList.contains('cr-details-top-host'), false);
+    assert.equal(f.window.getComputedStyle(column).paddingTop, '20px');
 });
 
 test('configuration uses 3px and 8px defaults and preserves previously saved offsets', async t => {

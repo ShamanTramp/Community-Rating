@@ -42,7 +42,8 @@
         .cr-badge{align-items:center;display:inline-flex;gap:.25em;padding:.12em .4em;border-radius:999px;background:rgba(0,0,0,var(--cr-bg-opacity,.45));color:#fff;font-size:var(--cr-size,16px);font-weight:600;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.8);white-space:nowrap;pointer-events:auto;cursor:default}
         .cr-badge svg{width:1em;height:1em;flex:none;fill:currentColor}
         .cr-badge:focus-visible{outline:2px solid var(--accent-color,#00a4dc);outline-offset:2px}
-        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.65em;flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box;clear:both;margin:.65em 0 .5em}
+        .detailPagePrimaryContent.cr-details-top-host{padding-top:0}
+        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:flex-start;align-self:flex-start;justify-content:center;gap:.65em;order:-1;flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box;clear:both;margin:0 0 .5em}
         .cr-details-stack .cr-badge{font-size:var(--cr-detail-size,var(--cr-size,16px))}
         .cr-tooltip{position:fixed;z-index:99999;max-width:min(320px,80vw);max-height:40vh;overflow:auto;padding:.65em .85em;border:1px solid var(--card-bracket-color,rgba(255,255,255,.16));border-radius:.55em;background:var(--card-background-color,rgba(25,25,25,.96));color:var(--primary-text-color,#fff);box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:.9rem;line-height:1.5;white-space:pre-line;pointer-events:none}
         .cr-tooltip[hidden]{display:none}
@@ -367,6 +368,7 @@
                 applyOptions();
                 if (!options || !options.Enabled) {
                     document.querySelectorAll('.cr-badge-stack,.cr-details-stack').forEach(element => element.remove());
+                    document.querySelectorAll('.cr-details-top-host').forEach(element => element.classList.remove('cr-details-top-host'));
                     return;
                 }
                 response.Items.forEach(item => cache.set(item.ItemId.toLowerCase(), item));
@@ -417,16 +419,18 @@
 
     function render(target, item) {
         const primaryContent = target.detail && target.element.querySelector('.detailPagePrimaryContent');
-        const contentColumn = primaryContent && (primaryContent.querySelector('.detailSection') || primaryContent);
         const ratingBlock = target.detail && (target.element.querySelector('.itemMiscInfo-secondary') || target.element.querySelector('.itemMiscInfo'));
         const host = target.detail
-            ? (contentColumn || target.element.querySelector('.infoWrapper') || ratingBlock?.parentElement)
+            ? (primaryContent || target.element.querySelector('.infoWrapper') || ratingBlock?.parentElement)
             : (target.element.querySelector('.cardScalable') || target.element.querySelector('.cardImageContainer') || target.element);
         if (!host) return;
         const existing = target.element.querySelector(target.detail ? '.cr-details-stack' : '.cr-badge-stack');
         const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, options.AdminTooltipsEnabled, isAdmin, uiLanguage()]);
         if (existing?.dataset.crSignature === signature) {
-            if (target.detail && contentColumn && existing.parentElement !== host) host.prepend(existing);
+            if (primaryContent) {
+                host.classList.add('cr-details-top-host');
+                if (host.firstElementChild !== existing) host.prepend(existing);
+            }
             return;
         }
         if (existing) {
@@ -444,9 +448,12 @@
         if (target.detail || item.LikeCount > 0) stack.appendChild(makeBadge('like', item.LikeCount, item.ItemId, 'LikedBy'));
 
         if (target.detail) {
-            // Use the description/track-selection column so Jellyfin's own
-            // poster offsets and responsive padding determine the center.
-            if (contentColumn) host.prepend(stack);
+            // Sit directly below the header, before the content sections, while
+            // retaining Jellyfin's horizontal content padding and poster offset.
+            if (primaryContent) {
+                host.classList.add('cr-details-top-host');
+                host.prepend(stack);
+            }
             else if (ratingBlock?.parentElement === host) ratingBlock.insertAdjacentElement('afterend', stack);
             else host.appendChild(stack);
         } else {

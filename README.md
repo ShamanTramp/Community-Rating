@@ -11,7 +11,7 @@
 - Counts favorites on the movie, episode, or series itself.
 - Ignores disabled accounts and user names listed in the exclusions.
 - Shows white view and favorite icons in the upper-left corner of media cards, either on one line or stacked vertically. Views always appear first, including zero; favorites are hidden when their count is zero.
-- Places both counters on a separate row centered within the media content column on detail pages, including zero favorites. The row follows the description column's width and poster offsets. Detail size follows the configured base counter size multiplied by an optional enlargement factor; the default factor of 1 matches cards (16 px by default).
+- Places both counters at the top of the media content column, directly below the header and rating block, including zero favorites. The row retains Jellyfin's horizontal content padding and poster offsets, with no extra gap above it. Detail size follows the configured base counter size multiplied by an optional enlargement factor; the default factor of 1 matches cards (16 px by default).
 - Adds **Viewed by members** and **Liked by members** to supported library sort menus (**Vus par les membres** and **Aimés par les membres** in French). Both default to descending order.
 - Shows a tooltip above each counter for everyone, on hover or keyboard focus: **Viewed by members** for views and **Liked by members** for favorites (**Vu par les membres** and **Aimé par les membres** in French). Press Escape to dismiss it.
 - Administrators can optionally see member names below the tooltip label, with one name per line. Name lists are disabled by default; the names endpoint requires administrator access. Label tooltips remain available regardless of this setting.
@@ -33,7 +33,7 @@ In Jellyfin, open **Dashboard → Plugins → Repositories**, then add the repos
 https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/manifest.json
 ```
 
-Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.3.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.3.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
+Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.4.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.4.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
 
 Jellyfin must be able to access the manifest and package files on GitHub to install and update the plugin.
 
