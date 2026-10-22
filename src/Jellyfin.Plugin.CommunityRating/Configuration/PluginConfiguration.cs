@@ -21,7 +21,7 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     public int BadgeScale { get; set; } = 16;
 
     /// <summary>Gets or sets the horizontal inset from the upper-left corner.</summary>
-    public int BadgeInsetX { get; set; } = 8;
+    public int BadgeInsetX { get; set; } = 3;
 
     /// <summary>Gets or sets the vertical inset from the upper-left corner.</summary>
     public int BadgeInsetY { get; set; } = 8;

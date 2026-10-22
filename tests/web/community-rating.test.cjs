@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../../src/Jellyfin.Plugin.C
 
 function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3, 1] }, library = [], detail = false } = {}) {
     let writes = 0;
-    const options = { Enabled: true, BadgeScale: 16, BadgeInsetX: 8, BadgeInsetY: 8, BackgroundOpacity: 45, StackCardBadges: false, AdminTooltipsEnabled: true };
+    const options = { Enabled: true, BadgeScale: 16, BadgeInsetX: 3, BadgeInsetY: 8, BackgroundOpacity: 45, StackCardBadges: false, AdminTooltipsEnabled: true };
     class Element {
         constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {}; this.listeners = {}; this.isConnected = true; }
         appendChild(node) { writes++; this.children.push(node); node.parentElement = this; return node; }
@@ -15,6 +15,7 @@ function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3,
         remove() { writes++; this.isConnected = false; this.parentElement.children = this.parentElement.children.filter(node => node !== this); }
         setAttribute(name, value) { this[name] = value; }
         getAttribute(name) { return this[name]; }
+        removeAttribute(name) { delete this[name]; }
         addEventListener(name, handler) { this.listeners[name] = handler; }
         querySelector(selector) {
             if (selector === '.cardScalable') return this;
@@ -37,7 +38,7 @@ function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3,
     const events = {};
     const document = {
         head, body,
-        documentElement: { style: { setProperty: (key, value) => { properties[key] = value; } } },
+        documentElement: { lang: 'fr', style: { setProperty: (key, value) => { properties[key] = value; } } },
         createElement: tag => new Element(tag),
         getElementById: id => head.children.find(node => node.id === id),
         querySelector: selector => detail && selector === '.itemDetailPage' ? detailPage : null,
@@ -109,12 +110,14 @@ test('zero views remain visible, zero favorites are hidden, and layout updates e
     assert.equal(f.cardNodes[0].children[0], stack);
 });
 
-test('ordinary accounts never request names or receive tooltip focus targets', async () => {
+test('ordinary accounts receive label tooltips without requesting member names', async () => {
     const f = fixture();
     await f.settle();
     const badge = f.cardNodes[0].children[0].children[0];
-    assert.equal(badge.tabIndex, -1);
-    assert.equal(badge.listeners.mouseenter, undefined);
+    assert.equal(badge.tabIndex, 0);
+    await badge.listeners.focus({ currentTarget: badge });
+    assert.equal(f.body.children[0].textContent, 'Vu par les membres');
+    assert.ok(Number.parseFloat(f.body.children[0].style.top) < badge.getBoundingClientRect().top);
     assert.equal(f.calls.some(url => url.includes('/Admin/')), false);
 });
 
@@ -141,9 +144,9 @@ test('administrator tooltips show names and do not reopen after the pointer leav
     event.currentTarget = null;
     badge.listeners.mouseleave();
     await pending;
-    assert.equal(f.body.children.length, 0);
+    assert.equal(f.body.children[0].hidden, true);
     await badge.listeners.focus({ currentTarget: badge });
-    assert.equal(f.body.children[0].textContent, 'Alpha\nBeta');
+    assert.equal(f.body.children[0].textContent, 'Vu par les membres\nAlpha\nBeta');
     assert.equal(f.body.children[0].hidden, false);
 });
 

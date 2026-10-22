@@ -17,13 +17,33 @@
     let lastSortContext = null;
     let pendingSortSelection = null;
     const sortModeIds = { views: 'CommunityRatingViews', likes: 'CommunityRatingLikes' };
+    const translations = {
+        en: {
+            viewLabel: 'Viewed by members', likeLabel: 'Liked by members',
+            sortViews: 'Viewed by members', sortLikes: 'Liked by members', noMembers: 'No members'
+        },
+        fr: {
+            viewLabel: 'Vu par les membres', likeLabel: 'Aimé par les membres',
+            sortViews: 'Vus par les membres', sortLikes: 'Aimés par les membres', noMembers: 'Aucun membre'
+        }
+    };
+
+    function uiLanguage() {
+        const locale = document.documentElement.lang || (typeof navigator !== 'undefined' && navigator.language) || 'en';
+        return String(locale).toLowerCase().split(/[-_]/)[0];
+    }
+
+    function translate(key) {
+        return translations[uiLanguage()]?.[key] ?? translations.en[key] ?? key;
+    }
 
     const styles = `
-        .cr-badge-stack{display:flex;flex-direction:var(--cr-card-direction,row);align-items:flex-start;gap:4px;position:absolute;z-index:5;top:var(--cr-inset-y,8px);left:var(--cr-inset-x,8px);pointer-events:none}
+        .cr-badge-stack{display:flex;flex-direction:var(--cr-card-direction,row);align-items:flex-start;gap:4px;position:absolute;z-index:5;top:var(--cr-inset-y,8px);left:var(--cr-inset-x,3px);pointer-events:none}
         .cr-badge{align-items:center;display:inline-flex;gap:.25em;padding:.12em .4em;border-radius:999px;background:rgba(0,0,0,var(--cr-bg-opacity,.45));color:#fff;font-size:var(--cr-size,16px);font-weight:600;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.8);white-space:nowrap;pointer-events:auto;cursor:default}
         .cr-badge svg{width:1em;height:1em;flex:none;fill:currentColor}
         .cr-badge:focus-visible{outline:2px solid var(--accent-color,#00a4dc);outline-offset:2px}
-        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:center;gap:.45em;margin:.25em 0}
+        .cr-details-stack{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.65em;flex:0 0 100%;width:100%;box-sizing:border-box;clear:both;margin:.65em 0 .5em}
+        .cr-details-stack .cr-badge{font-size:var(--cr-detail-size,20px);padding:.18em .55em}
         .cr-tooltip{position:fixed;z-index:99999;max-width:min(320px,80vw);max-height:40vh;overflow:auto;padding:.65em .85em;border:1px solid var(--card-bracket-color,rgba(255,255,255,.16));border-radius:.55em;background:var(--card-background-color,rgba(25,25,25,.96));color:var(--primary-text-color,#fff);box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:.9rem;line-height:1.5;white-space:pre-line;pointer-events:none}
         .cr-tooltip[hidden]{display:none}
     `;
@@ -169,8 +189,11 @@
             }
             const query = menuOptions.query;
             lastSortContext = { route: location.hash, query };
-            for (const [mode, name] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
-                if (!menuOptions.items.some(item => item.id === sortModeIds[mode])) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+                const name = translate(key);
+                const existing = menuOptions.items.find(item => item.id === sortModeIds[mode]);
+                if (existing) existing.name = name;
+                else {
                     menuOptions.items.push({ name, id: sortModeIds[mode] });
                 }
             }
@@ -194,14 +217,20 @@
         if (!supportedSortPage()) return;
         // The select menu persists its values and creates a fresh API query later.
         document.querySelectorAll('.formDialog .selectSortBy').forEach(select => {
-            if (select.dataset.crSortExtended) return;
+            if (select.dataset.crSortExtended) {
+                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+                    const option = select.querySelector('option[value="' + sortModeIds[mode] + '"]');
+                    if (option && option.textContent !== translate(key)) option.textContent = translate(key);
+                }
+                return;
+            }
             select.dataset.crSortExtended = 'true';
             const selected = select.value || (lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '');
-            for (const [mode, label] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
                 if (select.querySelector('option[value="' + sortModeIds[mode] + '"]')) continue;
                 const option = document.createElement('option');
                 option.value = sortModeIds[mode];
-                option.textContent = label;
+                option.textContent = translate(key);
                 select.appendChild(option);
             }
             if (communitySortMode(selected)) select.value = selected;
@@ -217,11 +246,19 @@
         // available globally. Native radio handlers keep saving and refreshing.
         document.querySelectorAll('.formDialog').forEach(dialog => {
             const native = dialog.querySelector('input.menuSortBy');
-            if (!native || dialog.querySelector('input.menuSortBy[value="' + sortModeIds.views + '"]')) return;
+            if (!native) return;
+            if (dialog.querySelector('input.menuSortBy[value="' + sortModeIds.views + '"]')) {
+                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+                    const input = dialog.querySelector('input.menuSortBy[value="' + sortModeIds[mode] + '"]');
+                    const label = input?.closest('label')?.lastElementChild;
+                    if (label?.tagName === 'SPAN' && label.textContent !== translate(key)) label.textContent = translate(key);
+                }
+                return;
+            }
             const parent = native.closest('label')?.parentElement;
             if (!parent) return;
             const selected = lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '';
-            for (const [mode, title] of [['views', 'Vus par les membres'], ['likes', 'Aimés par les membres']]) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
                 const label = document.createElement('label');
                 label.className = 'radio-label-block';
                 const input = document.createElement('input', { is: 'emby-radio' });
@@ -250,7 +287,7 @@
                     }
                 });
                 const text = document.createElement('span');
-                text.textContent = title;
+                text.textContent = translate(key);
                 label.appendChild(input);
                 label.appendChild(text);
                 parent.appendChild(label);
@@ -352,9 +389,11 @@
 
     function applyOptions() {
         if (!options) return;
-        document.documentElement.style.setProperty('--cr-size', `${options.BadgeScale}px`);
-        document.documentElement.style.setProperty('--cr-inset-x', `${options.BadgeInsetX}px`);
-        document.documentElement.style.setProperty('--cr-inset-y', `${options.BadgeInsetY}px`);
+        const size = Number.isFinite(options.BadgeScale) ? options.BadgeScale : 16;
+        document.documentElement.style.setProperty('--cr-size', `${size}px`);
+        document.documentElement.style.setProperty('--cr-detail-size', `${Math.round(size * 1.25)}px`);
+        document.documentElement.style.setProperty('--cr-inset-x', `${Number.isFinite(options.BadgeInsetX) ? options.BadgeInsetX : 3}px`);
+        document.documentElement.style.setProperty('--cr-inset-y', `${Number.isFinite(options.BadgeInsetY) ? options.BadgeInsetY : 8}px`);
         document.documentElement.style.setProperty('--cr-bg-opacity', String(options.BackgroundOpacity / 100));
         document.documentElement.style.setProperty('--cr-card-direction', options.StackCardBadges === true ? 'column' : 'row');
     }
@@ -362,17 +401,16 @@
     function makeBadge(kind, count, itemId, namesKey) {
         const row = document.createElement('span');
         row.className = 'cr-badge';
-        row.tabIndex = options && options.AdminTooltipsEnabled && isAdmin === true ? 0 : -1;
+        row.tabIndex = 0;
         row.dataset.crItemId = itemId;
         row.dataset.crNamesKey = namesKey;
-        row.setAttribute('aria-label', `${kind === 'view' ? 'Vues' : 'Favoris'} : ${count}`);
+        row.dataset.crLabel = translate(kind === 'view' ? 'viewLabel' : 'likeLabel');
+        row.setAttribute('aria-label', `${row.dataset.crLabel} : ${count}`);
         row.innerHTML = `${kind === 'view' ? eyeIcon : heartIcon}<span>${count}</span>`;
-        if (row.tabIndex === 0) {
-            row.addEventListener('mouseenter', showTooltip);
-            row.addEventListener('focus', showTooltip);
-            row.addEventListener('mouseleave', hideTooltip);
-            row.addEventListener('blur', hideTooltip);
-        }
+        row.addEventListener('mouseenter', showTooltip);
+        row.addEventListener('focus', showTooltip);
+        row.addEventListener('mouseleave', hideTooltip);
+        row.addEventListener('blur', hideTooltip);
         return row;
     }
 
@@ -381,9 +419,12 @@
             ? (target.element.querySelector('.itemMiscInfo') || target.element.querySelector('.detailPagePrimaryContainer') || target.element)
             : (target.element.querySelector('.cardScalable') || target.element.querySelector('.cardImageContainer') || target.element);
         const existing = target.element.querySelector(target.detail ? '.cr-details-stack' : '.cr-badge-stack');
-        const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, options.AdminTooltipsEnabled, isAdmin]);
+        const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, options.AdminTooltipsEnabled, isAdmin, uiLanguage()]);
         if (existing?.dataset.crSignature === signature) return;
-        if (existing) existing.remove();
+        if (existing) {
+            if (tooltipBadge?.dataset.crItemId === item.ItemId) hideTooltip();
+            existing.remove();
+        }
 
         const stack = document.createElement('div');
         stack.className = target.detail ? 'cr-details-stack' : 'cr-badge-stack';
@@ -395,7 +436,7 @@
         if (target.detail || item.LikeCount > 0) stack.appendChild(makeBadge('like', item.LikeCount, item.ItemId, 'LikedBy'));
 
         if (target.detail) {
-            const ratingBlock = target.element.querySelector('.itemMiscInfo');
+            const ratingBlock = target.element.querySelector('.itemMiscInfo-secondary') || target.element.querySelector('.itemMiscInfo');
             if (ratingBlock && ratingBlock.parentElement) ratingBlock.insertAdjacentElement('afterend', stack);
             else host.appendChild(stack);
         } else {
@@ -405,20 +446,45 @@
 
     let tooltipElement;
     let tooltipRequest = 0;
+    let tooltipBadge;
     function getTooltip() {
         if (tooltipElement) return tooltipElement;
         tooltipElement = document.createElement('div');
+        tooltipElement.id = 'communityRatingTooltip';
         tooltipElement.className = 'cr-tooltip';
+        tooltipElement.hidden = true;
         tooltipElement.hidden = true;
         tooltipElement.setAttribute('role', 'tooltip');
         document.body.appendChild(tooltipElement);
         return tooltipElement;
     }
 
+    function displayTooltip(badge, text) {
+        const tip = getTooltip();
+        if (tooltipBadge && tooltipBadge !== badge) tooltipBadge.removeAttribute('aria-describedby');
+        tooltipBadge = badge;
+        tip.textContent = text;
+        tip.hidden = false;
+        badge.setAttribute('aria-describedby', tip.id);
+        const rect = badge.getBoundingClientRect();
+        const width = tip.offsetWidth || 0;
+        const height = tip.offsetHeight || 0;
+        const badgeWidth = rect.width ?? Math.max(0, (rect.right ?? rect.left) - rect.left);
+        const left = rect.left + badgeWidth / 2 - width / 2;
+        const above = rect.top - height - 8;
+        const top = above >= 8 ? above : rect.bottom + 8;
+        tip.style.left = `${Math.max(8, Math.min(left, window.innerWidth - width - 8))}px`;
+        tip.style.top = `${Math.max(8, Math.min(top, window.innerHeight - height - 8))}px`;
+    }
+
     async function showTooltip(event) {
         const badge = event.currentTarget;
         const request = ++tooltipRequest;
-        if (!options || !options.AdminTooltipsEnabled || !await currentUserIsAdmin()) return;
+        if (!badge.isConnected) return;
+        const label = badge.dataset.crLabel;
+        displayTooltip(badge, label);
+        if (!options?.AdminTooltipsEnabled || !await currentUserIsAdmin()) return;
+        if (request !== tooltipRequest || !badge.isConnected || !options.AdminTooltipsEnabled) return;
         const itemId = badge.dataset.crItemId;
         const key = badge.dataset.crNamesKey;
         const cacheKey = itemId.toLowerCase();
@@ -426,6 +492,7 @@
         if (!names) {
             try {
                 const result = await ApiClient.getJSON(apiUrl('Admin/Items', [itemId]));
+                if (request !== tooltipRequest || !badge.isConnected || !options.AdminTooltipsEnabled) return;
                 const entry = result.find(item => item.ItemId.toLowerCase() === cacheKey);
                 names = entry ? { ViewedBy: entry.ViewedBy || [], LikedBy: entry.LikedBy || [] } : { ViewedBy: [], LikedBy: [] };
                 tooltipCache.set(cacheKey, names);
@@ -433,19 +500,16 @@
                 return;
             }
         }
-        if (request !== tooltipRequest || !badge.isConnected) return;
+        if (request !== tooltipRequest || !badge.isConnected || !options.AdminTooltipsEnabled) return;
         const people = names[key] || [];
-        const tip = getTooltip();
-        tip.textContent = people.length ? people.join('\n') : 'Aucun compte';
-        tip.hidden = false;
-        const rect = badge.getBoundingClientRect();
-        tip.style.left = `${Math.min(rect.left, window.innerWidth - tip.offsetWidth - 8)}px`;
-        tip.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - tip.offsetHeight - 8)}px`;
+        displayTooltip(badge, label + '\n' + (people.length ? people.join('\n') : translate('noMembers')));
     }
 
     function hideTooltip() {
         tooltipRequest++;
         if (tooltipElement) tooltipElement.hidden = true;
+        if (tooltipBadge) tooltipBadge.removeAttribute('aria-describedby');
+        tooltipBadge = null;
     }
 
     function invalidateCounts() {
@@ -458,10 +522,14 @@
 
     ensureStyle();
     const observer = new MutationObserver(queueScan);
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['lang'] });
     window.addEventListener('hashchange', queueScan);
     window.addEventListener('popstate', queueScan);
     window.addEventListener('scroll', queueScan, { passive: true });
+    window.addEventListener('scroll', hideTooltip, { passive: true, capture: true });
+    window.addEventListener('hashchange', hideTooltip);
+    window.addEventListener('popstate', hideTooltip);
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') hideTooltip(); });
     document.addEventListener('click', event => {
         if (event.target.closest('.btnSort')) installCommunitySortSupport();
         if (event.target.closest('.buttonUserData,.btnUserData,.itemAction,.cardOverlayButton')) {

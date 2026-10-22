@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.1.2.0",
+        "changelog": "Add public hover and keyboard label tooltips, French and English UI text with English fallback, a centered larger detail-page counter row, and default card insets of 3px horizontally and 8px vertically.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.2.0.zip",
+        "checksum": "f8b0bcb9895947effa003fe3ceedd5df",
+        "timestamp": "2026-10-22T14:46:07Z"
+      },
+      {
         "version": "0.1.1.0",
         "changelog": "Fix member sort options in both Jellyfin sort menus, including late-loaded menus, folder lists, pagination, filters, and saved selections.",
         "targetAbi": "10.11.11.0",

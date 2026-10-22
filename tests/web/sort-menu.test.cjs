@@ -5,8 +5,8 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const source = fs.readFileSync(path.join(__dirname, '../../src/Jellyfin.Plugin.CommunityRating/Web/community-rating.js'), 'utf8');
 
-function clientFixture(t, route = '#/movies') {
-    const dom = new JSDOM('<!doctype html><html><head></head><body><button class="btnSort">Sort</button></body></html>', {
+function clientFixture(t, route = '#/movies', language = 'fr') {
+    const dom = new JSDOM('<!doctype html><html lang="' + language + '"><head></head><body><button class="btnSort">Sort</button></body></html>', {
         url: 'https://jellyfin.invalid/web/' + route, runScripts: 'outside-only'
     });
     let closed = false;
@@ -219,4 +219,27 @@ test('folder lists infer support from their media cards when the query has no it
     assert.equal(select.value, 'CommunityRatingLikes');
     const result = await f.window.ApiClient.getItems('member', { ParentId: 'collection', SortBy: select.value, SortOrder: 'Descending', Limit: 1 });
     assert.equal(result.Items[0].Id, 'item-2');
+});
+
+test('both sort menus translate to English, French, and English fallback without duplicates', async t => {
+    const f = clientFixture(t, '#/movies', 'en-US');
+    const query = { IncludeItemTypes: 'Movie', SortBy: 'SortName', Limit: 1 };
+    await f.window.ApiClient.getItems('member', query);
+    const selectMenu = selectDialog(f);
+    const radioMenu = radioDialog(f, query, () => {});
+    await f.settle();
+    const select = selectMenu.querySelector('option[value="CommunityRatingViews"]');
+    const radio = radioMenu.querySelector('input[value="CommunityRatingLikes"]').closest('label');
+    assert.equal(select.textContent, 'Viewed by members');
+    assert.equal(radio.textContent, 'Liked by members');
+    f.document.documentElement.lang = 'fr-CA';
+    await f.settle();
+    assert.equal(select.textContent, 'Vus par les membres');
+    assert.equal(radio.textContent, 'Aimés par les membres');
+    f.document.documentElement.lang = 'de';
+    await f.settle();
+    assert.equal(select.textContent, 'Viewed by members');
+    assert.equal(radio.textContent, 'Liked by members');
+    assert.equal(selectMenu.querySelectorAll('option[value="CommunityRatingViews"]').length, 1);
+    assert.equal(radioMenu.querySelectorAll('input[value="CommunityRatingLikes"]').length, 1);
 });

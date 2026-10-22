@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Community Rating</title>
@@ -12,54 +12,55 @@
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="EnableBadges" type="checkbox" is="emby-checkbox" />
-                            <span>Afficher les compteurs de vues et de favoris</span>
+                            <span data-cr-i18n="showCounters">Show view and favorite counters</span>
                         </label>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="ExcludedUserNames">Comptes à exclure</label>
+                        <label class="inputLabel inputLabelUnfocused" for="ExcludedUserNames" data-cr-i18n="excludedAccounts">Excluded accounts</label>
                         <input id="ExcludedUserNames" type="text" is="emby-input" autocomplete="off" />
-                        <div class="fieldDescription">Noms Jellyfin séparés par des virgules. Les comptes désactivés sont toujours exclus. Laisser vide pour ne pas exclure d’autres comptes.</div>
+                        <div class="fieldDescription" data-cr-i18n="excludedDescription">Jellyfin user names separated by commas. Disabled accounts are always excluded. Leave empty for no additional exclusions.</div>
                     </div>
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="EnableAdminTooltips" type="checkbox" is="emby-checkbox" />
-                            <span>Autoriser les administrateurs à voir les pseudos dans les infobulles</span>
+                            <span data-cr-i18n="adminTooltips">Allow administrators to see member names in tooltips</span>
                         </label>
-                        <div class="fieldDescription">Désactivé par défaut. Les pseudos restent réservés aux administrateurs et ne sont pas exposés aux autres comptes.</div>
+                        <div class="fieldDescription" data-cr-i18n="adminDescription">Disabled by default. Member names are restricted to administrators. Counter label tooltips remain available to everyone.</div>
                     </div>
                     <div class="selectContainer">
-                        <label class="selectLabel" for="StackCardBadges">Disposition des compteurs sur les vignettes</label>
+                        <label class="selectLabel" for="StackCardBadges" data-cr-i18n="cardLayout">Card counter layout</label>
                         <select id="StackCardBadges" is="emby-select" class="emby-select-withcolor emby-select">
-                            <option value="false">Sur une ligne</option>
-                            <option value="true">Empilés</option>
+                            <option value="false" data-cr-i18n="layoutRow">One line</option>
+                            <option value="true" data-cr-i18n="layoutStacked">Stacked</option>
                         </select>
-                        <div class="fieldDescription">Les vues apparaissent en premier, suivies des favoris. Les favoris restent masqués lorsque leur compteur est à zéro.</div>
+                        <div class="fieldDescription" data-cr-i18n="layoutDescription">Views appear first, followed by favorites. Favorites remain hidden when their count is zero.</div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="BadgeScale">Taille des icônes et compteurs (px)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeScale" data-cr-i18n="badgeScale">Icon and counter size (px)</label>
                         <input id="BadgeScale" type="number" is="emby-input" min="12" max="28" step="1" />
+                        <div class="fieldDescription" data-cr-i18n="scaleDescription">Counters are 25% larger on detail pages.</div>
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetX">Décalage horizontal depuis le coin (px)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetX" data-cr-i18n="insetX">Horizontal inset from the corner (px)</label>
                         <input id="BadgeInsetX" type="number" is="emby-input" min="0" max="32" step="1" />
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetY">Décalage vertical depuis le coin (px)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="BadgeInsetY" data-cr-i18n="insetY">Vertical inset from the corner (px)</label>
                         <input id="BadgeInsetY" type="number" is="emby-input" min="0" max="32" step="1" />
                     </div>
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="BackgroundOpacity">Opacité du fond des badges (%)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="BackgroundOpacity" data-cr-i18n="backgroundOpacity">Counter background opacity (%)</label>
                         <input id="BackgroundOpacity" type="number" is="emby-input" min="0" max="90" step="5" />
                     </div>
                     <div class="selectContainer">
-                        <label class="selectLabel" for="RefreshIntervalHours">Réconciliation complète</label>
+                        <label class="selectLabel" for="RefreshIntervalHours" data-cr-i18n="reconciliation">Full reconciliation</label>
                         <select id="RefreshIntervalHours" is="emby-select" class="emby-select-withcolor emby-select">
-                            <option value="1">Toutes les heures</option>
-                            <option value="6">Toutes les 6 heures</option>
+                            <option value="1" data-cr-i18n="intervalHour">Every hour</option>
+                            <option value="6" data-cr-i18n="intervalSixHours">Every 6 hours</option>
                         </select>
-                        <div class="fieldDescription">Choisir une heure si la tâche complète dure moins de cinq minutes; sinon préférer six heures. Elle reste lançable manuellement dans les tâches planifiées.</div>
+                        <div class="fieldDescription" data-cr-i18n="reconciliationDescription">Choose hourly if a full rebuild takes less than five minutes; otherwise use six hours. You can also run it manually from Scheduled Tasks.</div>
                     </div>
-                    <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span>Enregistrer</span></button>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button"><span data-cr-i18n="save">Save</span></button>
                 </form>
             </div>
         </div>
@@ -67,8 +68,65 @@
             const CommunityRatingConfig = { pluginUniqueId: '8b270d4b-75f2-4ad3-9be6-1c18684945c9' };
             const page = document.querySelector('#CommunityRatingConfigPage');
             const form = document.querySelector('#CommunityRatingConfigForm');
-            const ids = ['EnableBadges', 'ExcludedUserNames', 'EnableAdminTooltips', 'StackCardBadges', 'BadgeScale', 'BadgeInsetX', 'BadgeInsetY', 'BackgroundOpacity', 'RefreshIntervalHours'];
+            const translations = {
+                "en": {
+                    "showCounters": "Show view and favorite counters",
+                    "excludedAccounts": "Excluded accounts",
+                    "excludedDescription": "Jellyfin user names separated by commas. Disabled accounts are always excluded. Leave empty for no additional exclusions.",
+                    "adminTooltips": "Allow administrators to see member names in tooltips",
+                    "adminDescription": "Disabled by default. Member names are restricted to administrators. Counter label tooltips remain available to everyone.",
+                    "cardLayout": "Card counter layout",
+                    "layoutRow": "One line",
+                    "layoutStacked": "Stacked",
+                    "layoutDescription": "Views appear first, followed by favorites. Favorites remain hidden when their count is zero.",
+                    "badgeScale": "Icon and counter size (px)",
+                    "scaleDescription": "Counters are 25% larger on detail pages.",
+                    "insetX": "Horizontal inset from the corner (px)",
+                    "insetY": "Vertical inset from the corner (px)",
+                    "backgroundOpacity": "Counter background opacity (%)",
+                    "reconciliation": "Full reconciliation",
+                    "intervalHour": "Every hour",
+                    "intervalSixHours": "Every 6 hours",
+                    "reconciliationDescription": "Choose hourly if a full rebuild takes less than five minutes; otherwise use six hours. You can also run it manually from Scheduled Tasks.",
+                    "save": "Save"
+                },
+                "fr": {
+                    "showCounters": "Afficher les compteurs de vues et de favoris",
+                    "excludedAccounts": "Comptes à exclure",
+                    "excludedDescription": "Noms Jellyfin séparés par des virgules. Les comptes désactivés sont toujours exclus. Laisser vide pour ne pas exclure d’autres comptes.",
+                    "adminTooltips": "Autoriser les administrateurs à voir les pseudos dans les infobulles",
+                    "adminDescription": "Désactivé par défaut. Les pseudos restent réservés aux administrateurs. Les libellés des compteurs sont toujours affichés dans les infobulles pour tous les utilisateurs.",
+                    "cardLayout": "Disposition des compteurs sur les vignettes",
+                    "layoutRow": "Sur une ligne",
+                    "layoutStacked": "Empilés",
+                    "layoutDescription": "Les vues apparaissent en premier, suivies des favoris. Les favoris restent masqués lorsque leur compteur est à zéro.",
+                    "badgeScale": "Taille des icônes et compteurs (px)",
+                    "scaleDescription": "Les compteurs sont 25 % plus grands sur la page détail.",
+                    "insetX": "Décalage horizontal depuis le coin (px)",
+                    "insetY": "Décalage vertical depuis le coin (px)",
+                    "backgroundOpacity": "Opacité du fond des badges (%)",
+                    "reconciliation": "Réconciliation complète",
+                    "intervalHour": "Toutes les heures",
+                    "intervalSixHours": "Toutes les 6 heures",
+                    "reconciliationDescription": "Choisir une heure si la tâche complète dure moins de cinq minutes; sinon préférer six heures. Elle reste lançable manuellement dans les tâches planifiées.",
+                    "save": "Enregistrer"
+                }
+            };
+            function translatePage() {
+                const locale = document.documentElement.lang || navigator.language || 'en';
+                const language = String(locale).toLowerCase().split(/[-_]/)[0];
+                page.querySelectorAll('[data-cr-i18n]').forEach(function (element) {
+                    const key = element.getAttribute('data-cr-i18n');
+                    const value = translations[language]?.[key] ?? translations.en[key] ?? key;
+                    if (element.textContent !== value) element.textContent = value;
+                });
+            }
+            const languageObserver = new MutationObserver(translatePage);
+            page.addEventListener('pagehide', function () { languageObserver.disconnect(); });
+            translatePage();
             page.addEventListener('pageshow', function () {
+                translatePage();
+                languageObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(CommunityRatingConfig.pluginUniqueId).then(function (config) {
                     document.querySelector('#EnableBadges').checked = config.EnableBadges !== false;
@@ -76,7 +134,7 @@
                     document.querySelector('#EnableAdminTooltips').checked = config.EnableAdminTooltips === true;
                     document.querySelector('#StackCardBadges').value = config.StackCardBadges === true ? 'true' : 'false';
                     document.querySelector('#BadgeScale').value = config.BadgeScale || 16;
-                    document.querySelector('#BadgeInsetX').value = Number.isFinite(config.BadgeInsetX) ? config.BadgeInsetX : 8;
+                    document.querySelector('#BadgeInsetX').value = Number.isFinite(config.BadgeInsetX) ? config.BadgeInsetX : 3;
                     document.querySelector('#BadgeInsetY').value = Number.isFinite(config.BadgeInsetY) ? config.BadgeInsetY : 8;
                     document.querySelector('#BackgroundOpacity').value = Number.isFinite(config.BackgroundOpacity) ? config.BackgroundOpacity : 45;
                     document.querySelector('#RefreshIntervalHours').value = config.RefreshIntervalHours === 1 ? '1' : '6';

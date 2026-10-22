@@ -58,5 +58,7 @@ public sealed class CommunityApiContractTests
         var config = new PluginConfiguration();
         Assert.False(config.StackCardBadges);
         Assert.False(config.EnableAdminTooltips);
+        Assert.Equal(3, config.BadgeInsetX);
+        Assert.Equal(8, config.BadgeInsetY);
     }
 }
