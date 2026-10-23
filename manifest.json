@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.5.0",
+        "changelog": "See the GitHub release notes.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/ShamanTramp/Community-Rating/releases/download/v0.2.5.0/community-rating-0.2.5.0.zip",
+        "checksum": "413d4819d4821ed525898cb087d7432a",
+        "timestamp": "2026-10-23T17:39:15Z"
+      },
+      {
         "version": "0.2.4.0",
         "changelog": "See the GitHub release notes.",
         "targetAbi": "10.11.11.0",
