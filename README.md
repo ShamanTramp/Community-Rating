@@ -31,7 +31,7 @@ In Jellyfin, open **Dashboard → Plugins → Repositories**, then add this mani
 https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/manifest.json
 ```
 
-Save the repository, open the plugin catalog, select **Available** if needed, and install **Community Rating**. Restart Jellyfin and reload the Web client. The [0.2.0.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.2.0.0.zip) is also available directly. After upgrading, fully reload the page to replace any script left running by the previous version.
+Save the repository, open the plugin catalog, select **Available** if needed, and install **Community Rating**. Restart Jellyfin and reload the Web client. The [latest plugin package](https://github.com/ShamanTramp/Community-Rating/releases/latest) is also available directly. After upgrading, fully reload the page to replace any script left running by the previous version.
 
 ## Configuration
 

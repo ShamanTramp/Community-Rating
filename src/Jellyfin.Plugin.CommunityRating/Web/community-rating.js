@@ -59,6 +59,7 @@
         .cr-badge.cr-vote[data-kind="discourage"]{color:var(--cr-discourage-color,#fff)}
         .cr-badge.cr-vote[data-kind="recommend"][data-count]:not([data-count="0"]){color:#43d17b}
         .cr-badge.cr-vote[data-kind="discourage"][data-count]:not([data-count="0"]){color:#ff5a62}
+        .cr-badge.cr-vote[data-count="0"]::after{content:"0";visibility:hidden;pointer-events:none}
         .cr-badge.cr-vote[data-kind="recommend"]:hover,.cr-badge.cr-vote[data-kind="recommend"]:focus-visible{color:#43d17b}
         .cr-badge.cr-vote[data-kind="discourage"]:hover,.cr-badge.cr-vote[data-kind="discourage"]:focus-visible{color:#ff5a62}
         .cr-badge.cr-vote[aria-pressed="true"][data-kind="recommend"]{color:#43d17b}
