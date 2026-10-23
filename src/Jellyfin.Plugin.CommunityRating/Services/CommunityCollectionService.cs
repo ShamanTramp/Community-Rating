@@ -145,6 +145,7 @@ public sealed class CommunityCollectionService : BackgroundService
 
                 var desired = stats.Where(entry =>
                         entry.ItemId != Guid.Empty
+                        && definition.Count(entry) > 0
                         && (definition.Series
                             ? _libraryManager.GetItemById(entry.ItemId) is MediaBrowser.Controller.Entities.TV.Series
                             : _libraryManager.GetItemById(entry.ItemId) is Movie))

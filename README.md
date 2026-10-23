@@ -16,7 +16,7 @@
 - Colors thumbs green and red on hover, keyboard focus, and after a vote. The member's own vote is exposed accessibly.
 - Provides automatic, one-line, and one-column card layouts. Automatic mode reserves space for Jellyfin's watched marker in the upper-right corner and stacks the counters vertically whenever they do not fit on one line.
 - Shows count-aware French and English tooltips, with English fallback, and adds four community sorts to supported library lists.
-- Creates eight visible native Jellyfin collections: views, favorites, recommendations, and negative recommendations, each for movies and series. Episode votes contribute to series collections; episodes are not added directly.
+- Creates eight visible native Jellyfin collections: views, favorites, recommendations, and negative recommendations, each for movies and series. Each collection contains only titles with at least one matching member marker or vote. Episode votes contribute to series collections; episodes are not added directly.
 - Adapts Kefin Tweaks collection sections to preserve Community Rating ranking. Other compatible clients, including Wholfin, can use the native collections without JavaScript injection.
 
 Community sorts rank the complete filtered result before pagination. The first sort can take longer on large libraries. Vote, played, and favorite changes refresh affected totals; collection membership and order are reconciled in the background and by the scheduled task.
