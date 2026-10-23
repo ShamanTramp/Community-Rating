@@ -64,7 +64,6 @@
         .cr-badge.cr-vote[data-kind="discourage"]:hover,.cr-badge.cr-vote[data-kind="discourage"]:focus-visible{color:#ff5a62}
         .cr-badge.cr-vote[aria-pressed="true"][data-kind="recommend"]{color:#43d17b}
         .cr-badge.cr-vote[aria-pressed="true"][data-kind="discourage"]{color:#ff5a62}
-        .cr-badge-stack.cr-layout-grid{display:grid;grid-template-columns:repeat(2,max-content);}
         .cr-badge-stack.cr-layout-column{display:flex;flex-direction:column;}
         .detailPagePrimaryContent.cr-details-top-host{padding-top:0}
         .cr-details-stack{display:flex;flex-wrap:wrap;align-items:flex-start;align-self:flex-start;justify-content:center;gap:.65em;order:-1;flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box;clear:none;margin:0 0 .5em}
@@ -590,16 +589,13 @@
         if (!window.ResizeObserver || stack._crResizeObserver) return;
         const update = () => {
             const configured = options?.CardLayout || (options?.StackCardBadges ? 'column' : 'row');
-            stack.classList.remove('cr-layout-grid', 'cr-layout-column');
+            stack.classList.remove('cr-layout-column');
             if (configured === 'column') { stack.classList.add('cr-layout-column'); return; }
             if (configured === 'row') return;
             const badges = [...stack.querySelectorAll('.cr-badge')];
             const available = Math.max(0, host.clientWidth - (options?.BadgeInsetX || 3) - 32);
             const rowWidth = badges.reduce((sum, badge) => sum + badge.getBoundingClientRect().width, 0) + Math.max(0, badges.length - 1) * 4;
-            if (rowWidth <= available) return;
-            const columnWidth = Math.max(...badges.map(badge => badge.getBoundingClientRect().width));
-            if (columnWidth * 2 + 4 <= available) stack.classList.add('cr-layout-grid');
-            else stack.classList.add('cr-layout-column');
+            if (rowWidth > available) stack.classList.add('cr-layout-column');
         };
         stack._crUpdateLayout = update;
         stack._crResizeObserver = new ResizeObserver(update);

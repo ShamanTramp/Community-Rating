@@ -32,10 +32,9 @@
                         <select id="StackCardBadges" is="emby-select" class="emby-select-withcolor emby-select">
                             <option value="auto" data-cr-i18n="layoutAuto">Automatic</option>
                             <option value="row" data-cr-i18n="layoutRow">One line</option>
-                            <option value="grid" data-cr-i18n="layoutGrid">Two columns</option>
                             <option value="column" data-cr-i18n="layoutStacked">One column</option>
                         </select>
-                        <div class="fieldDescription" data-cr-i18n="layoutDescription">Automatic layout accounts for the Jellyfin watched marker in the upper-right corner.</div>
+                        <div class="fieldDescription" data-cr-i18n="layoutDescription">Automatic layout uses one line when the counters fit and stacks them in one column otherwise.</div>
                     </div>
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label"><input id="RankingCollectionsEnabled" type="checkbox" is="emby-checkbox" /><span data-cr-i18n="rankingCollections">Create and update eight native ranking collections</span></label>
@@ -90,10 +89,9 @@
                     "adminDescription": "Disabled by default. Member names are restricted to administrators. Counter label tooltips remain available to everyone.",
                     "cardLayout": "Card counter layout",
                     "layoutRow": "One line",
-                    "layoutGrid": "Two columns",
                     "layoutStacked": "One column",
                     "layoutAuto": "Automatic",
-                    "layoutDescription": "Automatic layout accounts for the Jellyfin watched marker in the upper-right corner.",
+                    "layoutDescription": "Automatic layout uses one line when the counters fit and stacks them in one column otherwise, reserving room for Jellyfin's watched marker.",
                     "rankingCollections": "Create and update eight native ranking collections",
                     "rankingDescription": "Visible Jellyfin collections for movies and series, available to all compatible clients.",
                     "syncCollections": "Synchronize collections now",
@@ -118,10 +116,9 @@
                     "adminDescription": "Désactivé par défaut. Les pseudos restent réservés aux administrateurs. Les libellés des compteurs sont toujours affichés dans les infobulles pour tous les utilisateurs.",
                     "cardLayout": "Disposition des compteurs sur les vignettes",
                     "layoutRow": "Sur une ligne",
-                    "layoutGrid": "Deux colonnes",
                     "layoutStacked": "Une colonne",
                     "layoutAuto": "Automatique",
-                    "layoutDescription": "La disposition automatique tient compte du marqueur Jellyfin de lecture, en haut à droite.",
+                    "layoutDescription": "La disposition automatique garde une ligne si les compteurs tiennent, sinon elle les empile en une colonne. Elle réserve aussi la place du marqueur de lecture Jellyfin.",
                     "rankingCollections": "Créer et synchroniser huit collections natives de classement",
                     "rankingDescription": "Collections Jellyfin visibles de films et séries, utilisables par les clients compatibles.",
                     "syncCollections": "Synchroniser les collections maintenant",
@@ -159,8 +156,8 @@
                     document.querySelector('#EnableBadges').checked = config.EnableBadges !== false;
                     document.querySelector('#ExcludedUserNames').value = config.ExcludedUserNames || '';
                     document.querySelector('#EnableAdminTooltips').checked = config.EnableAdminTooltips === true;
-                    document.querySelector('#StackCardBadges').value = config.StackCardBadges === true && config.CardLayout === 'auto'
-                        ? 'column' : (config.CardLayout || (config.StackCardBadges === true ? 'column' : 'row'));
+                    const cardLayout = config.CardLayout === 'grid' ? 'auto' : (config.CardLayout || (config.StackCardBadges === true ? 'column' : 'row'));
+                    document.querySelector('#StackCardBadges').value = config.StackCardBadges === true && cardLayout === 'auto' ? 'column' : cardLayout;
                     document.querySelector('#RankingCollectionsEnabled').checked = config.RankingCollectionsEnabled !== false;
                     document.querySelector('#BadgeScale').value = config.BadgeScale || 16;
                     document.querySelector('#DetailScaleFactor').value = Number.isFinite(config.DetailScaleFactor) ? Math.min(3, Math.max(1, config.DetailScaleFactor)) : 1;

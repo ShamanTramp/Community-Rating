@@ -150,7 +150,7 @@ public sealed class CommunityRatingController(CommunityStatsService statsService
         config.StackCardBadges,
         double.IsFinite(config.DetailScaleFactor) ? Math.Clamp(config.DetailScaleFactor, 1, 3) : 1,
         config.StackCardBadges && config.CardLayout == "auto" ? "column"
-            : config.CardLayout is "row" or "grid" or "column" or "auto" ? config.CardLayout : "auto",
+            : config.CardLayout is "row" or "column" or "auto" ? config.CardLayout : "auto",
         config.RankingCollectionsEnabled);
 
     private bool TryGetUserId(out Guid userId)

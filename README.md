@@ -14,7 +14,7 @@
 - Excludes disabled, deleted, and configured accounts. Administrator tooltips can show included member names when enabled.
 - Shows views, favorites, recommendations, and negative recommendations on cards and details. Views stay visible at zero; card favorites hide at zero; zero-count thumbs are white and show no number.
 - Colors thumbs green and red on hover, keyboard focus, and after a vote. The member's own vote is exposed accessibly.
-- Provides automatic, one-line, two-column, and one-column card layouts. Automatic mode reserves space for Jellyfin's watched marker in the upper-right corner.
+- Provides automatic, one-line, and one-column card layouts. Automatic mode reserves space for Jellyfin's watched marker in the upper-right corner and stacks the counters vertically whenever they do not fit on one line.
 - Shows count-aware French and English tooltips, with English fallback, and adds four community sorts to supported library lists.
 - Creates eight visible native Jellyfin collections: views, favorites, recommendations, and negative recommendations, each for movies and series. Episode votes contribute to series collections; episodes are not added directly.
 - Adapts Kefin Tweaks collection sections to preserve Community Rating ranking. Other compatible clients, including Wholfin, can use the native collections without JavaScript injection.
@@ -42,7 +42,7 @@ Open **Dashboard → Plugins → Community Rating**:
 | Show counters | Enabled | Shows aggregate views, favorites, recommendations, and negative recommendations. |
 | Excluded accounts | Empty | Comma-separated Jellyfin user names. Disabled accounts are always excluded. |
 | Administrator tooltips | Disabled | Lets administrators see included member names in tooltips. The server protects the names endpoint. |
-| Card layout | Automatic | Fits one line, two columns, or one column. Manual modes are also available. |
+| Card layout | Automatic | Uses one line when the counters fit; otherwise stacks them in one column. Manual one-line and one-column modes are also available. |
 | Ranking collections | Enabled | Creates and synchronizes eight visible movie and series collections. Use **Synchronize collections now** for a manual refresh. |
 | Icon and counter size | 16 px | Base size from 12 to 28 px. |
 | Detail enlargement factor | 1 | Multiplies the base size on detail pages, from 1 to 3. |
