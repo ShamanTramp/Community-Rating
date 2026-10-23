@@ -61,7 +61,7 @@ The four recommendation collections use these exact names:
 - Séries recommandées par les membres
 - Séries déconseillées par les membres
 
-The other four collections cover views and favorites for films and series. They are ordinary, visible Jellyfin collections, so clients such as Wholfin can add them to home pages. In Kefin Tweaks, add each collection as a collection-based custom home section. Community Rating keeps these sections ordered by the corresponding member total. The Web script is needed only for Kefin's ranking integration; collection membership is stored by Jellyfin.
+The other four collections cover views and favorites for films and series. They are ordinary, visible Jellyfin collections, so clients such as Wholfin can add them to home pages. Items with zero matching markers stay at the bottom: Jellyfin removes empty collections during library cleanup, so retaining titles keeps all eight collections available. In Kefin Tweaks, add each collection as a collection-based custom home section. Community Rating keeps these sections ordered by the corresponding member total. The Web script is needed only for Kefin's ranking integration; collection membership is stored by Jellyfin.
 
 ### Vote storage
 

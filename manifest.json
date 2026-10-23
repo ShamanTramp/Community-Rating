@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.1.0",
+        "changelog": "Keep all eight native ranking collections populated and available through Jellyfin library cleanup; sort zero-count titles after scored titles and run the initial sync after startup cleanup.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.2.1.0.zip",
+        "checksum": "bcbc7a7cd496f1bb9625ca9d551934b9",
+        "timestamp": "2026-10-23T16:28:05Z"
+      },
+      {
         "version": "0.2.0.0",
         "changelog": "Add persistent positive and negative member votes, episode-to-series vote aggregation, four community sorts, adaptive thumb badges, Kefin Tweaks ranking support, and eight visible native Jellyfin collections for movies and series.",
         "targetAbi": "10.11.11.0",

@@ -68,6 +68,8 @@ public sealed class CommunityCollectionService : BackgroundService
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Jellyfin's startup task removes empty BoxSets; run after its initial cleanup.
+        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken).ConfigureAwait(false);
         if (Plugin.Instance?.Configuration.RankingCollectionsEnabled == true) RequestSync();
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -145,8 +147,7 @@ public sealed class CommunityCollectionService : BackgroundService
                         entry.ItemId != Guid.Empty
                         && (definition.Series
                             ? _libraryManager.GetItemById(entry.ItemId) is MediaBrowser.Controller.Entities.TV.Series
-                            : _libraryManager.GetItemById(entry.ItemId) is Movie)
-                        && definition.Count(entry) > 0)
+                            : _libraryManager.GetItemById(entry.ItemId) is Movie))
                     .OrderByDescending(definition.Count)
                     .ThenBy(entry => _libraryManager.GetItemById(entry.ItemId)?.SortName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                     .Select(entry => entry.ItemId).ToArray();
