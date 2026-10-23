@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.2.0",
+        "changelog": "See the GitHub release notes.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/ShamanTramp/Community-Rating/releases/download/v0.2.2.0/community-rating-0.2.2.0.zip",
+        "checksum": "5bbea87c451636b68cca0de7fee6ef04",
+        "timestamp": "2026-10-23T16:52:29Z"
+      },
+      {
         "version": "0.2.1.0",
         "changelog": "Keep all eight native ranking collections populated and available through Jellyfin library cleanup; sort zero-count titles after scored titles and run the initial sync after startup cleanup.",
         "targetAbi": "10.11.11.0",
