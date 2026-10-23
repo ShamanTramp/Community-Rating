@@ -54,12 +54,11 @@
         .cr-badge svg{width:1em;height:1em;flex:none;fill:currentColor}
         .cr-badge .cr-count{color:#fff}
         .cr-badge:focus-visible{outline:2px solid var(--accent-color,#00a4dc);outline-offset:2px}
-        .cr-badge.cr-vote{border:0;font:inherit;cursor:pointer;transition:color .12s ease,background-color .12s ease}
+        .cr-badge.cr-vote{box-sizing:content-box;min-height:1.3em;border:0;font-family:inherit;cursor:pointer;transition:color .12s ease,background-color .12s ease}
         .cr-badge.cr-vote[data-kind="recommend"]{color:var(--cr-recommend-color,#fff)}
         .cr-badge.cr-vote[data-kind="discourage"]{color:var(--cr-discourage-color,#fff)}
         .cr-badge.cr-vote[data-kind="recommend"][data-count]:not([data-count="0"]){color:#43d17b}
         .cr-badge.cr-vote[data-kind="discourage"][data-count]:not([data-count="0"]){color:#ff5a62}
-        .cr-badge.cr-vote[data-count="0"]::after{content:"0";visibility:hidden;pointer-events:none}
         .cr-badge.cr-vote[data-kind="recommend"]:hover,.cr-badge.cr-vote[data-kind="recommend"]:focus-visible{color:#43d17b}
         .cr-badge.cr-vote[data-kind="discourage"]:hover,.cr-badge.cr-vote[data-kind="discourage"]:focus-visible{color:#ff5a62}
         .cr-badge.cr-vote[aria-pressed="true"][data-kind="recommend"]{color:#43d17b}
