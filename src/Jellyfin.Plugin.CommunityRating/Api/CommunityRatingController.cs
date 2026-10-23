@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
+using System.Security.Claims;
 using Jellyfin.Plugin.CommunityRating.Configuration;
 using Jellyfin.Plugin.CommunityRating.Services;
 using MediaBrowser.Common.Api;
@@ -13,7 +14,7 @@ namespace Jellyfin.Plugin.CommunityRating.Api;
 /// <summary>Endpoints for aggregate community markers and the client-side renderer.</summary>
 [ApiController]
 [Route("CommunityRating")]
-public sealed class CommunityRatingController(CommunityStatsService statsService) : ControllerBase
+public sealed class CommunityRatingController(CommunityStatsService statsService, CommunityCollectionService? collectionService = null) : ControllerBase
 {
     private const int MaximumBatchSize = 100;
 
@@ -36,6 +37,65 @@ public sealed class CommunityRatingController(CommunityStatsService statsService
         var items = await statsService.GetStatsAsync(ids, cancellationToken).ConfigureAwait(false);
         return Ok(new CommunityStatsResponse(items.Select(CommunityItemCounts.FromStats).ToArray(), ToDisplayOptions(config)));
     }
+
+    /// <summary>Reads the signed-in member's own vote state for a batch of media items.</summary>
+    [HttpGet("Me/Votes")]
+    [Authorize]
+    public async Task<IActionResult> GetMyVotes([FromQuery(Name = "ids")] Guid[]? ids, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (ids is null || ids.Length == 0 || ids.Length > MaximumBatchSize) return BadRequest("Request between 1 and 100 item ids.");
+        var votes = await statsService.GetUserVotesAsync(userId, ids, cancellationToken).ConfigureAwait(false);
+        return Ok(votes.Select(pair => new { ItemId = pair.Key, Vote = pair.Value }).ToArray());
+    }
+
+    /// <summary>Sets the signed-in member's vote for an accessible media item.</summary>
+    [HttpPut("Me/Votes/{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> SetMyVote(Guid id, [FromBody] SetCommunityVoteRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (request.Vote is not (1 or -1)) return BadRequest("Vote must be 1 or -1.");
+        var result = await statsService.SetVoteAsync(userId, id, request.Vote, cancellationToken).ConfigureAwait(false);
+        if (result is not null) collectionService?.RequestSync();
+        return result is null ? NotFound() : Ok(new
+        {
+            Item = CommunityItemCounts.FromStats(result.ItemStats),
+            Vote = request.Vote,
+            ParentSeries = result.ParentSeriesStats is null ? null : CommunityItemCounts.FromStats(result.ParentSeriesStats)
+        });
+    }
+
+    /// <summary>Clears the signed-in member's vote for an accessible media item.</summary>
+    [HttpDelete("Me/Votes/{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteMyVote(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var result = await statsService.SetVoteAsync(userId, id, null, cancellationToken).ConfigureAwait(false);
+        if (result is not null) collectionService?.RequestSync();
+        return result is null ? NotFound() : Ok(new
+        {
+            Item = CommunityItemCounts.FromStats(result.ItemStats),
+            Vote = (int?)null,
+            ParentSeries = result.ParentSeriesStats is null ? null : CommunityItemCounts.FromStats(result.ParentSeriesStats)
+        });
+    }
+
+    /// <summary>Queues or runs native ranking collection synchronization.</summary>
+    [HttpPost("Admin/Collections/Rebuild")]
+    [Authorize(Policy = Policies.RequiresElevation)]
+    public IActionResult RebuildCollections()
+    {
+        if (Plugin.Instance?.Configuration.RankingCollectionsEnabled != true) return BadRequest("Enable ranking collections in plugin settings first.");
+        collectionService?.RequestSync();
+        return Accepted();
+    }
+
+    /// <summary>Gets public IDs for the native collections managed by the plugin.</summary>
+    [HttpGet("Collections")]
+    [Authorize]
+    public IActionResult GetCollections() => Ok(collectionService?.GetManagedCollections() ?? []);
 
     /// <summary>Gets the client renderer for JavaScript Injector.</summary>
     /// <returns>JavaScript source.</returns>
@@ -88,5 +148,18 @@ public sealed class CommunityRatingController(CommunityStatsService statsService
         Math.Clamp(config.BackgroundOpacity, 0, 90),
         config.EnableAdminTooltips,
         config.StackCardBadges,
-        double.IsFinite(config.DetailScaleFactor) ? Math.Clamp(config.DetailScaleFactor, 1, 3) : 1);
+        double.IsFinite(config.DetailScaleFactor) ? Math.Clamp(config.DetailScaleFactor, 1, 3) : 1,
+        config.StackCardBadges && config.CardLayout == "auto" ? "column"
+            : config.CardLayout is "row" or "grid" or "column" or "auto" ? config.CardLayout : "auto",
+        config.RankingCollectionsEnabled);
+
+    private bool TryGetUserId(out Guid userId)
+    {
+        var value = User.FindFirst("Jellyfin-UserId")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(value, out userId);
+    }
 }
+
+/// <summary>A signed-in member's explicit positive or negative vote.</summary>
+public sealed record SetCommunityVoteRequest(int Vote);

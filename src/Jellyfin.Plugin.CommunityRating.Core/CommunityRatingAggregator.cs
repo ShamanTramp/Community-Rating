@@ -31,7 +31,12 @@ public static class CommunityRatingAggregator
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new CommunityItemStats(itemId, viewedBy.Length, likedBy.Length, viewedBy, likedBy);
+        var recommendedBy = eligible.Where(state => state.IsRecommended).Select(state => state.UserName)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        var discouragedBy = eligible.Where(state => state.IsDiscouraged).Select(state => state.UserName)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+
+        return new CommunityItemStats(itemId, viewedBy.Length, likedBy.Length, viewedBy, likedBy, recommendedBy, discouragedBy);
     }
 
     /// <summary>Aggregates a series view once per account if any episode was marked played.</summary>
@@ -43,7 +48,7 @@ public static class CommunityRatingAggregator
     public static CommunityItemStats AggregateSeries(
         Guid seriesId,
         IEnumerable<UserItemState> seriesStates,
-        IEnumerable<(string UserName, bool IsDisabled, bool IsPlayed)> episodeStates,
+        IEnumerable<(string UserName, bool IsDisabled, bool IsPlayed, bool IsRecommended, bool IsDiscouraged)> episodeStates,
         IEnumerable<string> excludedUserNames)
     {
         var excluded = CreateExcludedSet(excludedUserNames);
@@ -66,7 +71,19 @@ public static class CommunityRatingAggregator
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return new CommunityItemStats(seriesId, viewedBy.Length, likedBy.Length, viewedBy, likedBy);
+        var eligibleEpisodeStates = episodeStates.Where(state => !state.IsDisabled && !excluded.Contains(state.UserName)).ToArray();
+        var allNames = eligibleSeriesStates.Keys.Concat(eligibleEpisodeStates.Select(state => state.UserName))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var recommendedBy = allNames.Where(name =>
+                (eligibleSeriesStates.TryGetValue(name, out var direct) && direct.IsRecommended)
+                || eligibleEpisodeStates.Any(state => string.Equals(state.UserName, name, StringComparison.OrdinalIgnoreCase) && state.IsRecommended))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+        var discouragedBy = allNames.Where(name =>
+                (eligibleSeriesStates.TryGetValue(name, out var direct) && direct.IsDiscouraged)
+                || eligibleEpisodeStates.Any(state => string.Equals(state.UserName, name, StringComparison.OrdinalIgnoreCase) && state.IsDiscouraged))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
+
+        return new CommunityItemStats(seriesId, viewedBy.Length, likedBy.Length, viewedBy, likedBy, recommendedBy, discouragedBy);
     }
 
     /// <summary>Parses a comma-separated list of excluded user names.</summary>

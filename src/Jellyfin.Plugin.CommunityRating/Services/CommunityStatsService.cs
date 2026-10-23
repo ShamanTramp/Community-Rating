@@ -26,6 +26,7 @@ public sealed class CommunityStatsService : BackgroundService
     private readonly IUserDataManager _userDataManager;
     private readonly ILogger<CommunityStatsService> _logger;
     private readonly ITaskManager _taskManager;
+    private readonly CommunityVoteStore _voteStore;
     private readonly Channel<Guid> _dirtyItems = Channel.CreateUnbounded<Guid>(new UnboundedChannelOptions { SingleReader = true });
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _itemLocks = new();
     private ConcurrentDictionary<Guid, CommunityItemStats> _cache = new();
@@ -37,12 +38,14 @@ public sealed class CommunityStatsService : BackgroundService
         ILibraryManager libraryManager,
         IUserManager userManager,
         IUserDataManager userDataManager,
+        CommunityVoteStore voteStore,
         ITaskManager taskManager,
         ILogger<CommunityStatsService> logger)
     {
         _libraryManager = libraryManager;
         _userManager = userManager;
         _userDataManager = userDataManager;
+        _voteStore = voteStore;
         _logger = logger;
         _taskManager = taskManager;
         _lastExcludedUserNames = Plugin.Instance?.Configuration.ExcludedUserNames ?? string.Empty;
@@ -134,7 +137,8 @@ public sealed class CommunityStatsService : BackgroundService
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!_cache.TryGetValue(id, out var cached)
-                || cached.ViewedBy.Concat(cached.LikedBy).Any(name => !eligibleNames.Contains(name)))
+                || cached.ViewedBy.Concat(cached.LikedBy).Concat(cached.RecommendedBy ?? []).Concat(cached.DiscouragedBy ?? [])
+                    .Any(name => !eligibleNames.Contains(name)))
             {
                 await RefreshItemAndSeriesAsync(id, cancellationToken).ConfigureAwait(false);
             }
@@ -145,9 +149,48 @@ public sealed class CommunityStatsService : BackgroundService
             .OfType<CommunityItemStats>().ToArray();
     }
 
+    /// <summary>Returns cached aggregates for every movie and series in the library.</summary>
+    public async Task<IReadOnlyList<CommunityItemStats>> GetAllMovieAndSeriesStatsAsync(CancellationToken cancellationToken)
+    {
+        var items = _libraryManager.GetItemList(new InternalItemsQuery
+        {
+            IncludeItemTypes = [BaseItemKind.Movie, BaseItemKind.Series],
+            EnableTotalRecordCount = false
+        });
+        var result = new List<CommunityItemStats>(items.Count);
+        foreach (var batch in items.Select(item => item.Id).Chunk(100))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            result.AddRange(await GetStatsAsync(batch, cancellationToken).ConfigureAwait(false));
+        }
+        return result;
+    }
+
     /// <summary>Returns the administrator-only names associated with requested markers.</summary>
     public async Task<IReadOnlyList<CommunityItemStats>> GetAdminStatsAsync(IEnumerable<Guid> itemIds, CancellationToken cancellationToken) =>
         await GetStatsAsync(itemIds, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Reads the authenticated member's own votes for up to 100 media items.</summary>
+    public async Task<IReadOnlyDictionary<Guid, int>> GetUserVotesAsync(Guid userId, IEnumerable<Guid> itemIds, CancellationToken cancellationToken)
+    {
+        var votes = await _voteStore.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        return itemIds.Distinct().Take(100).ToDictionary(id => id, id => votes.GetValueOrDefault(CommunityVoteStore.CreateKey(userId, id)));
+    }
+
+    /// <summary>Stores or clears a vote after checking that the signed-in member can access the item.</summary>
+    public async Task<VoteMutationResult?> SetVoteAsync(Guid userId, Guid itemId, int? vote, CancellationToken cancellationToken)
+    {
+        var user = _userManager.GetUserById(userId);
+        if (user is null) return null;
+        var item = _libraryManager.GetItemById<BaseItem>(itemId, userId);
+        if (item is null || !IsSupported(item)) return null;
+        await _voteStore.SetAsync(userId, itemId, vote, cancellationToken).ConfigureAwait(false);
+        await RefreshItemAndSeriesAsync(itemId, cancellationToken).ConfigureAwait(false);
+        CommunityItemStats? parentStats = null;
+        if (item is Episode { Series: not null } episode)
+            parentStats = _cache.GetValueOrDefault(episode.Series.Id);
+        return _cache.TryGetValue(itemId, out var itemStats) ? new VoteMutationResult(itemStats, vote, parentStats) : null;
+    }
 
     /// <summary>Recalculates every movie, series, and episode in the library.</summary>
     public async Task RebuildAsync(IProgress<double>? progress, CancellationToken cancellationToken)
@@ -158,6 +201,7 @@ public sealed class CommunityStatsService : BackgroundService
             EnableTotalRecordCount = false
         });
         var users = GetEligibleUsers();
+        var votes = await _voteStore.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var excludedNames = GetExcludedNames();
         var episodesBySeries = items
             .OfType<Episode>()
@@ -170,7 +214,7 @@ public sealed class CommunityStatsService : BackgroundService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var item = items[index];
-            userStatesByItem[item.Id] = GetItemStates(item, users);
+            userStatesByItem[item.Id] = GetItemStates(item, users, votes);
             if (index % 50 == 0)
             {
                 progress?.Report(items.Count == 0 ? 80 : (double)index / items.Count * 80);
@@ -189,7 +233,7 @@ public sealed class CommunityStatsService : BackgroundService
             {
                 var episodeStates = episodesBySeries.TryGetValue(item.Id, out var episodes)
                     ? episodes.SelectMany(episode => userStatesByItem[episode.Id]
-                        .Select(state => (state.UserName, state.IsDisabled, state.IsPlayed)))
+                        .Select(state => (state.UserName, state.IsDisabled, state.IsPlayed, state.IsRecommended, state.IsDiscouraged)))
                     : [];
                 result = CommunityRatingAggregator.AggregateSeries(item.Id, states, episodeStates, excludedNames);
             }
@@ -330,15 +374,16 @@ public sealed class CommunityStatsService : BackgroundService
         }
     }
 
-    private Task<CommunityItemStats> CalculateItemAsync(BaseItem item, CancellationToken cancellationToken)
+    private async Task<CommunityItemStats> CalculateItemAsync(BaseItem item, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var users = GetEligibleUsers();
         var excludedNames = GetExcludedNames();
-        var itemStates = GetItemStates(item, users);
+        var votes = await _voteStore.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var itemStates = GetItemStates(item, users, votes);
         if (item is not Series series)
         {
-            return Task.FromResult(CommunityRatingAggregator.AggregateItem(item.Id, itemStates, excludedNames));
+            return CommunityRatingAggregator.AggregateItem(item.Id, itemStates, excludedNames);
         }
 
         var episodes = _libraryManager.GetItemList(new InternalItemsQuery
@@ -348,9 +393,9 @@ public sealed class CommunityStatsService : BackgroundService
             Recursive = true,
             EnableTotalRecordCount = false
         });
-        var episodeStates = episodes.SelectMany(episode => GetItemStates(episode, users)
-            .Select(state => (state.UserName, state.IsDisabled, state.IsPlayed)));
-        return Task.FromResult(CommunityRatingAggregator.AggregateSeries(series.Id, itemStates, episodeStates, excludedNames));
+        var episodeStates = episodes.SelectMany(episode => GetItemStates(episode, users, votes)
+            .Select(state => (state.UserName, state.IsDisabled, state.IsPlayed, state.IsRecommended, state.IsDiscouraged)));
+        return CommunityRatingAggregator.AggregateSeries(series.Id, itemStates, episodeStates, excludedNames);
     }
 
     private List<User> GetEligibleUsers()
@@ -365,12 +410,16 @@ public sealed class CommunityStatsService : BackgroundService
     private HashSet<string> GetExcludedNames() =>
         CommunityRatingAggregator.ParseExcludedUserNames(Plugin.Instance?.Configuration.ExcludedUserNames);
 
-    private UserItemState[] GetItemStates(BaseItem item, IReadOnlyList<User> users) =>
+    private UserItemState[] GetItemStates(BaseItem item, IReadOnlyList<User> users, IReadOnlyDictionary<string, int> votes) =>
         users.Select(user =>
         {
             var data = _userDataManager.GetUserData(user, item);
-            return new UserItemState(user.Username, false, data?.Played == true, data?.IsFavorite == true);
+            var vote = votes.GetValueOrDefault(CommunityVoteStore.CreateKey(user.Id, item.Id));
+            return new UserItemState(user.Username, false, data?.Played == true, data?.IsFavorite == true, vote > 0, vote < 0);
         }).ToArray();
 
     private static bool IsSupported(BaseItem item) => item is Movie or Series or Episode;
 }
+
+/// <summary>Result of updating a personal vote, including its affected series aggregate.</summary>
+public sealed record VoteMutationResult(CommunityItemStats ItemStats, int? Vote, CommunityItemStats? ParentSeriesStats);

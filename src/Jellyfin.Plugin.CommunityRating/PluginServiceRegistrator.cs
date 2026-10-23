@@ -12,6 +12,9 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<CommunityStatsService>();
+        serviceCollection.AddSingleton<CommunityVoteStore>();
+        serviceCollection.AddSingleton<CommunityCollectionService>();
+        serviceCollection.AddHostedService(services => services.GetRequiredService<CommunityCollectionService>());
         serviceCollection.AddHostedService(services => services.GetRequiredService<CommunityStatsService>());
         serviceCollection.AddHostedService<JavaScriptInjectorBridge>();
     }

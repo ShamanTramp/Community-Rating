@@ -17,6 +17,12 @@ public sealed class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets whether card counters are stacked vertically.</summary>
     public bool StackCardBadges { get; set; }
 
+    /// <summary>Gets or sets automatic, row, grid, or column card layout.</summary>
+    public string CardLayout { get; set; } = "auto";
+
+    /// <summary>Gets or sets whether native ranking collections are maintained.</summary>
+    public bool RankingCollectionsEnabled { get; set; } = true;
+
     /// <summary>Gets or sets the badge scale in CSS pixels.</summary>
     public int BadgeScale { get; set; } = 16;
 

@@ -38,11 +38,11 @@ public sealed class CommunityRatingAggregatorTests
                 new UserItemState("Gamma", false, false, false)
             ],
             [
-                ("Alpha", false, true),
-                ("Alpha", false, true),
-                ("Beta", false, true),
-                ("Excluded", false, true),
-                ("Disabled", true, true)
+                ("Alpha", false, true, true, false),
+                ("Alpha", false, true, true, true),
+                ("Beta", false, true, false, false),
+                ("Excluded", false, true, true, true),
+                ("Disabled", true, true, true, true)
             ],
             ["Excluded"]);
 
@@ -50,6 +50,27 @@ public sealed class CommunityRatingAggregatorTests
         Assert.Equal(1, result.LikeCount);
         Assert.Equal(["Alpha", "Beta"], result.ViewedBy);
         Assert.Equal(["Beta"], result.LikedBy);
+        Assert.Equal(["Alpha"], result.RecommendedBy);
+        Assert.Equal(["Alpha"], result.DiscouragedBy);
+    }
+
+    [Fact]
+    public void SeriesCountsBothVoteDirectionsOncePerMemberAcrossSeriesAndEpisodes()
+    {
+        var result = CommunityRatingAggregator.AggregateSeries(
+            Guid.NewGuid(),
+            [new UserItemState("Alpha", false, false, false, true)],
+            [
+                ("Alpha", false, false, true, false),
+                ("Alpha", false, false, true, true),
+                ("Alpha", false, false, false, true)
+            ],
+            []);
+
+        Assert.Equal(["Alpha"], result.RecommendedBy);
+        Assert.Equal(["Alpha"], result.DiscouragedBy);
+        Assert.Equal(1, result.RecommendationCount);
+        Assert.Equal(1, result.DiscouragementCount);
     }
 
     [Fact]

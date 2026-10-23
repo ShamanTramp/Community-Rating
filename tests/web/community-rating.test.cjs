@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../../src/Jellyfin.Plugin.C
 
 function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3, 1] }, library = [], detail = false } = {}) {
     let writes = 0;
-    const options = { Enabled: true, BadgeScale: 16, BadgeInsetX: 3, BadgeInsetY: 8, BackgroundOpacity: 45, StackCardBadges: false, AdminTooltipsEnabled: true };
+    const options = { Enabled: true, BadgeScale: 16, BadgeInsetX: 3, BadgeInsetY: 8, BackgroundOpacity: 45, StackCardBadges: false, CardLayout: 'auto', AdminTooltipsEnabled: true };
     class Element {
         constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {}; this.listeners = {}; this.isConnected = true; }
         appendChild(node) { writes++; this.children.push(node); node.parentElement = this; return node; }
@@ -60,9 +60,11 @@ function fixture({ admin = false, cards = ['movie-a'], counts = { 'movie-a': [3,
             getJSON: async url => {
                 calls.push(url);
                 const ids = new URL(url).searchParams.getAll('ids');
+                if (url.includes('/Me/Votes')) return ids.map(ItemId => ({ ItemId, Vote: 0 }));
                 if (url.includes('/Admin/')) return ids.map(ItemId => ({ ItemId, ViewedBy: ['Alpha', 'Beta'], LikedBy: ['Alpha'] }));
-                return { Options: { ...options }, Items: ids.filter(id => counts[id]).map(ItemId => ({ ItemId, ViewCount: counts[ItemId][0], LikeCount: counts[ItemId][1] })) };
+                return { Options: { ...options }, Items: ids.filter(id => counts[id]).map(ItemId => ({ ItemId, ViewCount: counts[ItemId][0], LikeCount: counts[ItemId][1], RecommendationCount: 0, DiscouragementCount: 0 })) };
             },
+            ajax: async request => ({ Vote: request.type === 'DELETE' ? null : JSON.parse(request.data).Vote, Item: { ItemId: 'movie-a', ViewCount: 3, LikeCount: 1, RecommendationCount: 1, DiscouragementCount: 0 } }),
             getItems: async (user, query) => ({ Items: library.slice(query.StartIndex, query.StartIndex + query.Limit), TotalRecordCount: library.length })
         },
         LibraryBrowser: { showSortMenu: value => { menu = value; } },
@@ -83,9 +85,9 @@ test('cards retain their DOM and focus when counts have not changed', async () =
     const f = fixture({ admin: true });
     await f.settle();
     const stack = f.cardNodes[0].children[0];
-    assert.equal(stack.children.length, 2);
-    assert.match(stack.children[0].innerHTML, /<span>3<\/span>/);
-    assert.match(stack.children[1].innerHTML, /<span>1<\/span>/);
+    assert.equal(stack.children.length, 4);
+    assert.match(stack.children[0].innerHTML, /<span class="cr-count">3<\/span>/);
+    assert.match(stack.children[1].innerHTML, /<span class="cr-count">1<\/span>/);
     assert.equal(stack.children[0].tabIndex, 0);
     const writes = f.writes;
     f.observers[0]();
@@ -100,13 +102,13 @@ test('zero views remain visible, zero favorites are hidden, and layout updates e
     const f = fixture({ counts: { 'movie-a': [0, 0] } });
     await f.settle();
     const stack = f.cardNodes[0].children[0];
-    assert.equal(stack.children.length, 1);
-    assert.match(stack.children[0].innerHTML, /<span>0<\/span>/);
-    assert.equal(f.properties['--cr-card-direction'], 'row');
-    f.options.StackCardBadges = true;
+    assert.equal(stack.children.length, 3);
+    assert.match(stack.children[0].innerHTML, /<span class="cr-count">0<\/span>/);
+    assert.equal(f.properties['--cr-card-layout'], 'auto');
+    f.options.CardLayout = 'column';
     f.intervals[0]();
     await f.settle();
-    assert.equal(f.properties['--cr-card-direction'], 'column');
+    assert.equal(f.properties['--cr-card-layout'], 'column');
     assert.equal(f.cardNodes[0].children[0], stack);
 });
 
@@ -116,7 +118,7 @@ test('ordinary accounts receive label tooltips without requesting member names',
     const badge = f.cardNodes[0].children[0].children[0];
     assert.equal(badge.tabIndex, 0);
     await badge.listeners.focus({ currentTarget: badge });
-    assert.equal(f.body.children[0].textContent, 'Vu par les membres');
+    assert.equal(f.body.children[0].textContent, 'Vu par 3 membres');
     assert.ok(Number.parseFloat(f.body.children[0].style.top) < badge.getBoundingClientRect().top);
     assert.equal(f.calls.some(url => url.includes('/Admin/')), false);
 });
@@ -126,8 +128,8 @@ test('detail pages retain ratings and show both zero counters regardless of card
     await f.settle();
     const stack = f.detailPage.querySelector('.cr-details-stack');
     assert.equal(f.detailPage.children[0], f.ratings);
-    assert.equal(stack.children.length, 2);
-    assert.match(stack.children[1].innerHTML, /<span>0<\/span>/);
+    assert.equal(stack.children.length, 4);
+    assert.match(stack.children[1].innerHTML, /<span class="cr-count">0<\/span>/);
     f.options.StackCardBadges = true;
     f.intervals[0]();
     await f.settle();
@@ -146,7 +148,7 @@ test('administrator tooltips show names and do not reopen after the pointer leav
     await pending;
     assert.equal(f.body.children[0].hidden, true);
     await badge.listeners.focus({ currentTarget: badge });
-    assert.equal(f.body.children[0].textContent, 'Vu par les membres\nAlpha\nBeta');
+    assert.equal(f.body.children[0].textContent, 'Vu par 3 membres\nAlpha\nBeta');
     assert.equal(f.body.children[0].hidden, false);
 });
 
@@ -158,7 +160,7 @@ test('community sorting ranks the entire filtered list before pagination and ref
     const f = fixture({ cards: [], library, counts });
     const query = { IncludeItemTypes: 'Movie', SortBy: 'SortName', SortOrder: 'Ascending', StartIndex: 0, Limit: 1 };
     f.sandbox.LibraryBrowser.showSortMenu({ query, items: [], callback() {} });
-    assert.deepEqual(Array.from(f.menu.items, item => item.name), ['Vus par les membres', 'Aimés par les membres']);
+    assert.deepEqual(Array.from(f.menu.items, item => item.name), ['Vus par les membres', 'Aimés par les membres', 'Recommandés par les membres', 'Déconseillés par les membres']);
     query.SortBy = 'CommunityRatingViews';
     f.menu.callback();
     await f.settle();

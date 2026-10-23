@@ -6,4 +6,13 @@ public sealed record CommunityItemStats(
     int ViewCount,
     int LikeCount,
     IReadOnlyList<string> ViewedBy,
-    IReadOnlyList<string> LikedBy);
+    IReadOnlyList<string> LikedBy,
+    IReadOnlyList<string>? RecommendedBy = null,
+    IReadOnlyList<string>? DiscouragedBy = null)
+{
+    /// <summary>Gets the number of included members recommending this item.</summary>
+    public int RecommendationCount => RecommendedBy?.Count ?? 0;
+
+    /// <summary>Gets the number of included members discouraging this item.</summary>
+    public int DiscouragementCount => DiscouragedBy?.Count ?? 0;
+}

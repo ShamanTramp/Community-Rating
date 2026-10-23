@@ -8,11 +8,11 @@ public sealed record CommunityStatsResponse(
     CommunityDisplayOptions Options);
 
 /// <summary>Public aggregate counts without per-account data.</summary>
-public sealed record CommunityItemCounts(Guid ItemId, int ViewCount, int LikeCount)
+public sealed record CommunityItemCounts(Guid ItemId, int ViewCount, int LikeCount, int RecommendationCount = 0, int DiscouragementCount = 0)
 {
     /// <summary>Projects internal statistics onto the public response.</summary>
     public static CommunityItemCounts FromStats(CommunityItemStats stats) =>
-        new(stats.ItemId, stats.ViewCount, stats.LikeCount);
+        new(stats.ItemId, stats.ViewCount, stats.LikeCount, stats.RecommendationCount, stats.DiscouragementCount);
 }
 
 /// <summary>Display settings safe to expose to authenticated Jellyfin users.</summary>
@@ -24,4 +24,6 @@ public sealed record CommunityDisplayOptions(
     int BackgroundOpacity,
     bool AdminTooltipsEnabled,
     bool StackCardBadges,
-    double DetailScaleFactor = 1);
+    double DetailScaleFactor = 1,
+    string CardLayout = "auto",
+    bool RankingCollectionsEnabled = false);

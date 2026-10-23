@@ -4,7 +4,7 @@ using MediaBrowser.Model.Tasks;
 namespace Jellyfin.Plugin.CommunityRating.ScheduledTasks;
 
 /// <summary>Reconciles cached community statistics against Jellyfin user data.</summary>
-public sealed class RebuildCommunityStatsTask(CommunityStatsService statsService) : IScheduledTask, IConfigurableScheduledTask
+public sealed class RebuildCommunityStatsTask(CommunityStatsService statsService, CommunityCollectionService collectionService) : IScheduledTask, IConfigurableScheduledTask
 {
     /// <inheritdoc />
     public string Name => "Rebuild Community Rating statistics";
@@ -28,8 +28,11 @@ public sealed class RebuildCommunityStatsTask(CommunityStatsService statsService
     public bool IsLogged => true;
 
     /// <inheritdoc />
-    public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken) =>
-        statsService.RebuildAsync(progress, cancellationToken);
+    public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    {
+        await statsService.RebuildAsync(progress, cancellationToken).ConfigureAwait(false);
+        await collectionService.SyncNowAsync(cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()

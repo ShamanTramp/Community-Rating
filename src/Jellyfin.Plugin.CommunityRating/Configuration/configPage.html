@@ -30,10 +30,18 @@
                     <div class="selectContainer">
                         <label class="selectLabel" for="StackCardBadges" data-cr-i18n="cardLayout">Card counter layout</label>
                         <select id="StackCardBadges" is="emby-select" class="emby-select-withcolor emby-select">
-                            <option value="false" data-cr-i18n="layoutRow">One line</option>
-                            <option value="true" data-cr-i18n="layoutStacked">Stacked</option>
+                            <option value="auto" data-cr-i18n="layoutAuto">Automatic</option>
+                            <option value="row" data-cr-i18n="layoutRow">One line</option>
+                            <option value="grid" data-cr-i18n="layoutGrid">Two columns</option>
+                            <option value="column" data-cr-i18n="layoutStacked">One column</option>
                         </select>
-                        <div class="fieldDescription" data-cr-i18n="layoutDescription">Views appear first, followed by favorites. Favorites remain hidden when their count is zero.</div>
+                        <div class="fieldDescription" data-cr-i18n="layoutDescription">Automatic layout accounts for the Jellyfin watched marker in the upper-right corner.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label"><input id="RankingCollectionsEnabled" type="checkbox" is="emby-checkbox" /><span data-cr-i18n="rankingCollections">Create and update eight native ranking collections</span></label>
+                        <div class="fieldDescription" data-cr-i18n="rankingDescription">Visible Jellyfin collections for movies and series, available to all compatible clients.</div>
+                        <button id="SyncRankingCollections" is="emby-button" type="button" class="raised emby-button"><span data-cr-i18n="syncCollections">Synchronize collections now</span></button>
+                        <div id="CollectionIds" class="fieldDescription"></div>
                     </div>
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="BadgeScale" data-cr-i18n="badgeScale">Icon and counter size (px)</label>
@@ -82,8 +90,13 @@
                     "adminDescription": "Disabled by default. Member names are restricted to administrators. Counter label tooltips remain available to everyone.",
                     "cardLayout": "Card counter layout",
                     "layoutRow": "One line",
-                    "layoutStacked": "Stacked",
-                    "layoutDescription": "Views appear first, followed by favorites. Favorites remain hidden when their count is zero.",
+                    "layoutGrid": "Two columns",
+                    "layoutStacked": "One column",
+                    "layoutAuto": "Automatic",
+                    "layoutDescription": "Automatic layout accounts for the Jellyfin watched marker in the upper-right corner.",
+                    "rankingCollections": "Create and update eight native ranking collections",
+                    "rankingDescription": "Visible Jellyfin collections for movies and series, available to all compatible clients.",
+                    "syncCollections": "Synchronize collections now",
                     "badgeScale": "Icon and counter size (px)",
                     "scaleDescription": "Base size for cards and detail pages.",
                     "detailScaleFactor": "Detail page enlargement factor",
@@ -105,8 +118,13 @@
                     "adminDescription": "Désactivé par défaut. Les pseudos restent réservés aux administrateurs. Les libellés des compteurs sont toujours affichés dans les infobulles pour tous les utilisateurs.",
                     "cardLayout": "Disposition des compteurs sur les vignettes",
                     "layoutRow": "Sur une ligne",
-                    "layoutStacked": "Empilés",
-                    "layoutDescription": "Les vues apparaissent en premier, suivies des favoris. Les favoris restent masqués lorsque leur compteur est à zéro.",
+                    "layoutGrid": "Deux colonnes",
+                    "layoutStacked": "Une colonne",
+                    "layoutAuto": "Automatique",
+                    "layoutDescription": "La disposition automatique tient compte du marqueur Jellyfin de lecture, en haut à droite.",
+                    "rankingCollections": "Créer et synchroniser huit collections natives de classement",
+                    "rankingDescription": "Collections Jellyfin visibles de films et séries, utilisables par les clients compatibles.",
+                    "syncCollections": "Synchroniser les collections maintenant",
                     "badgeScale": "Taille des icônes et compteurs (px)",
                     "scaleDescription": "Taille de base pour les vignettes et la page détail.",
                     "detailScaleFactor": "Coefficient d’agrandissement sur la page détail",
@@ -141,13 +159,20 @@
                     document.querySelector('#EnableBadges').checked = config.EnableBadges !== false;
                     document.querySelector('#ExcludedUserNames').value = config.ExcludedUserNames || '';
                     document.querySelector('#EnableAdminTooltips').checked = config.EnableAdminTooltips === true;
-                    document.querySelector('#StackCardBadges').value = config.StackCardBadges === true ? 'true' : 'false';
+                    document.querySelector('#StackCardBadges').value = config.StackCardBadges === true && config.CardLayout === 'auto'
+                        ? 'column' : (config.CardLayout || (config.StackCardBadges === true ? 'column' : 'row'));
+                    document.querySelector('#RankingCollectionsEnabled').checked = config.RankingCollectionsEnabled !== false;
                     document.querySelector('#BadgeScale').value = config.BadgeScale || 16;
                     document.querySelector('#DetailScaleFactor').value = Number.isFinite(config.DetailScaleFactor) ? Math.min(3, Math.max(1, config.DetailScaleFactor)) : 1;
                     document.querySelector('#BadgeInsetX').value = Number.isFinite(config.BadgeInsetX) ? config.BadgeInsetX : 3;
                     document.querySelector('#BadgeInsetY').value = Number.isFinite(config.BadgeInsetY) ? config.BadgeInsetY : 8;
                     document.querySelector('#BackgroundOpacity').value = Number.isFinite(config.BackgroundOpacity) ? config.BackgroundOpacity : 45;
                     document.querySelector('#RefreshIntervalHours').value = config.RefreshIntervalHours === 1 ? '1' : '6';
+                    ApiClient.getJSON(ApiClient.getUrl('CommunityRating/Collections')).then(function (collections) {
+                        document.querySelector('#CollectionIds').textContent = (collections || []).map(function (collection) {
+                            return collection.Name + ': ' + collection.Id;
+                        }).join(' · ');
+                    }).catch(function () {});
                     Dashboard.hideLoadingMsg();
                 }).catch(function () { Dashboard.hideLoadingMsg(); });
             });
@@ -158,7 +183,9 @@
                     config.EnableBadges = document.querySelector('#EnableBadges').checked;
                     config.ExcludedUserNames = document.querySelector('#ExcludedUserNames').value;
                     config.EnableAdminTooltips = document.querySelector('#EnableAdminTooltips').checked;
-                    config.StackCardBadges = document.querySelector('#StackCardBadges').value === 'true';
+                    config.CardLayout = document.querySelector('#StackCardBadges').value;
+                    config.StackCardBadges = config.CardLayout === 'column';
+                    config.RankingCollectionsEnabled = document.querySelector('#RankingCollectionsEnabled').checked;
                     config.BadgeScale = Math.min(28, Math.max(12, Number(document.querySelector('#BadgeScale').value) || 16));
                     const detailFactor = Number(document.querySelector('#DetailScaleFactor').value);
                     config.DetailScaleFactor = Number.isFinite(detailFactor) ? Math.min(3, Math.max(1, detailFactor)) : 1;
@@ -169,8 +196,17 @@
                     return ApiClient.updatePluginConfiguration(CommunityRatingConfig.pluginUniqueId, config);
                 }).then(function (result) {
                     Dashboard.processPluginConfigurationUpdateResult(result);
+                    if (document.querySelector('#RankingCollectionsEnabled').checked) {
+                        ApiClient.ajax({ url: ApiClient.getUrl('CommunityRating/Admin/Collections/Rebuild'), type: 'POST' }).catch(function () {});
+                    }
                 }).catch(function () { Dashboard.hideLoadingMsg(); });
                 return false;
+            });
+            document.querySelector('#SyncRankingCollections').addEventListener('click', function () {
+                Dashboard.showLoadingMsg();
+                ApiClient.ajax({ url: ApiClient.getUrl('CommunityRating/Admin/Collections/Rebuild'), type: 'POST' })
+                    .then(function () { Dashboard.hideLoadingMsg(); })
+                    .catch(function () { Dashboard.hideLoadingMsg(); });
             });
         </script>
     </div>

@@ -5,4 +5,6 @@ public sealed record UserItemState(
     string UserName,
     bool IsDisabled,
     bool IsPlayed,
-    bool IsFavorite);
+    bool IsFavorite,
+    bool IsRecommended = false,
+    bool IsDiscouraged = false);

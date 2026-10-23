@@ -14,17 +14,27 @@
     let scanning = false;
     let cacheRevision = 0;
     const customSortStates = new Map();
+    const managedCollections = new Map();
+    let collectionDiscovery = null;
+    let collectionDiscoveryTime = 0;
     let lastSortContext = null;
     let pendingSortSelection = null;
-    const sortModeIds = { views: 'CommunityRatingViews', likes: 'CommunityRatingLikes' };
+    const sortModeIds = { views: 'CommunityRatingViews', likes: 'CommunityRatingLikes', recommendations: 'CommunityRatingRecommendations', discouragements: 'CommunityRatingDiscouragements' };
+    const personalVotes = new Map();
     const translations = {
         en: {
-            viewLabel: 'Viewed by members', likeLabel: 'Liked by members',
-            sortViews: 'Viewed by members', sortLikes: 'Liked by members', noMembers: 'No members'
+            viewLabel: count => `Viewed by ${count} member${count === 1 ? '' : 's'}`,
+            likeLabel: count => `Liked by ${count} member${count === 1 ? '' : 's'}`,
+            recommendLabel: count => `Recommended by ${count} member${count === 1 ? '' : 's'}`,
+            discourageLabel: count => `Discouraged by ${count} member${count === 1 ? '' : 's'}`,
+            sortViews: 'Viewed by members', sortLikes: 'Liked by members', sortRecommendations: 'Recommended by members', sortDiscouragements: 'Discouraged by members', noMembers: 'No members', voteError: 'Could not save your vote.'
         },
         fr: {
-            viewLabel: 'Vu par les membres', likeLabel: 'Aimé par les membres',
-            sortViews: 'Vus par les membres', sortLikes: 'Aimés par les membres', noMembers: 'Aucun membre'
+            viewLabel: count => `Vu par ${count} membre${count === 1 ? '' : 's'}`,
+            likeLabel: count => `Aimé par ${count} membre${count === 1 ? '' : 's'}`,
+            recommendLabel: count => `Recommandé par ${count} membre${count === 1 ? '' : 's'}`,
+            discourageLabel: count => `Déconseillé par ${count} membre${count === 1 ? '' : 's'}`,
+            sortViews: 'Vus par les membres', sortLikes: 'Aimés par les membres', sortRecommendations: 'Recommandés par les membres', sortDiscouragements: 'Déconseillés par les membres', noMembers: 'Aucun membre', voteError: 'Impossible d’enregistrer votre vote.'
         }
     };
 
@@ -33,15 +43,28 @@
         return String(locale).toLowerCase().split(/[-_]/)[0];
     }
 
-    function translate(key) {
-        return translations[uiLanguage()]?.[key] ?? translations.en[key] ?? key;
+    function translate(key, ...args) {
+        const value = translations[uiLanguage()]?.[key] ?? translations.en[key] ?? key;
+        return typeof value === 'function' ? value(...args) : value;
     }
 
     const styles = `
-        .cr-badge-stack{display:flex;flex-direction:var(--cr-card-direction,row);align-items:flex-start;gap:4px;position:absolute;z-index:5;top:var(--cr-inset-y,8px);left:var(--cr-inset-x,3px);pointer-events:none}
+        .cr-badge-stack{display:flex;flex-direction:var(--cr-card-direction,row);align-items:flex-start;gap:4px;position:absolute;z-index:5;top:var(--cr-inset-y,8px);left:var(--cr-inset-x,3px);max-width:calc(100% - var(--cr-inset-x,3px) - var(--cr-reserved-right,32px));pointer-events:none}
         .cr-badge{align-items:center;display:inline-flex;gap:.25em;padding:.12em .4em;border-radius:999px;background:rgba(0,0,0,var(--cr-bg-opacity,.45));color:#fff;font-size:var(--cr-size,16px);font-weight:600;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.8);white-space:nowrap;pointer-events:auto;cursor:default}
         .cr-badge svg{width:1em;height:1em;flex:none;fill:currentColor}
+        .cr-badge .cr-count{color:#fff}
         .cr-badge:focus-visible{outline:2px solid var(--accent-color,#00a4dc);outline-offset:2px}
+        .cr-badge.cr-vote{border:0;font:inherit;cursor:pointer;transition:color .12s ease,background-color .12s ease}
+        .cr-badge.cr-vote[data-kind="recommend"]{color:var(--cr-recommend-color,#fff)}
+        .cr-badge.cr-vote[data-kind="discourage"]{color:var(--cr-discourage-color,#fff)}
+        .cr-badge.cr-vote[data-kind="recommend"][data-count]:not([data-count="0"]){color:#43d17b}
+        .cr-badge.cr-vote[data-kind="discourage"][data-count]:not([data-count="0"]){color:#ff5a62}
+        .cr-badge.cr-vote[data-kind="recommend"]:hover,.cr-badge.cr-vote[data-kind="recommend"]:focus-visible{color:#43d17b}
+        .cr-badge.cr-vote[data-kind="discourage"]:hover,.cr-badge.cr-vote[data-kind="discourage"]:focus-visible{color:#ff5a62}
+        .cr-badge.cr-vote[aria-pressed="true"][data-kind="recommend"]{color:#43d17b}
+        .cr-badge.cr-vote[aria-pressed="true"][data-kind="discourage"]{color:#ff5a62}
+        .cr-badge-stack.cr-layout-grid{display:grid;grid-template-columns:repeat(2,max-content);}
+        .cr-badge-stack.cr-layout-column{display:flex;flex-direction:column;}
         .detailPagePrimaryContent.cr-details-top-host{padding-top:0}
         .cr-details-stack{display:flex;flex-wrap:wrap;align-items:flex-start;align-self:flex-start;justify-content:center;gap:.65em;order:-1;flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box;clear:none;margin:0 0 .5em}
         .cr-details-stack .cr-badge{font-size:var(--cr-detail-size,var(--cr-size,16px))}
@@ -59,7 +82,83 @@
 
     function communitySortMode(sortBy) {
         const first = (Array.isArray(sortBy) ? sortBy.join(',') : String(sortBy || '')).split(',')[0];
-        return first === sortModeIds.views ? 'views' : first === sortModeIds.likes ? 'likes' : null;
+        return Object.keys(sortModeIds).find(mode => sortModeIds[mode] === first) || null;
+    }
+
+    async function loadManagedCollections() {
+        if (collectionDiscovery || Date.now() - collectionDiscoveryTime < 30000) return collectionDiscovery || managedCollections;
+        collectionDiscoveryTime = Date.now();
+        collectionDiscovery = ApiClient.getJSON(ApiClient.getUrl('CommunityRating/Collections'))
+            .then(rows => {
+                managedCollections.clear();
+                for (const row of rows || []) managedCollections.set(String(row.Id).toLowerCase(), row.Key);
+                return managedCollections;
+            })
+            .catch(() => managedCollections)
+            .finally(() => { collectionDiscovery = null; });
+        return collectionDiscovery;
+    }
+
+    async function rankKefinCollection(items, key) {
+        if (!Array.isArray(items) || !items.length) return items;
+        const counts = new Map();
+        for (let start = 0; start < items.length; start += 100) {
+            const response = await ApiClient.getJSON(apiUrl('Items', items.slice(start, start + 100).map(item => item.Id)));
+            for (const item of response.Items || []) counts.set(item.ItemId.toLowerCase(), item);
+        }
+        const metric = key.split('-').at(-1);
+        const property = { views: 'ViewCount', likes: 'LikeCount', recommended: 'RecommendationCount', discouraged: 'DiscouragementCount' }[metric];
+        return items.map(item => {
+            const rating = counts.get(item.Id.toLowerCase())?.[property] || 0;
+            item.__communityRatingCollection = key;
+            item.__communityRatingRank = rating;
+            item.CommunityRating = rating;
+            return item;
+        }).sort((left, right) => right.__communityRatingRank - left.__communityRatingRank
+            || (left.SortName || left.Name || '').localeCompare(right.SortName || right.Name || '', undefined, { sensitivity: 'base' }));
+    }
+
+    function installKefinCollectionAdapter() {
+        loadManagedCollections();
+        const helper = window.apiHelper;
+        if (helper?.getItems && !helper.getItems.__communityRatingInstalled) {
+            const getItems = helper.getItems;
+            const wrapped = async function (query = {}, useCache, ...rest) {
+                let collectionKey = managedCollections.get(String(query.ParentId || '').toLowerCase());
+                if (!collectionKey && query.ParentId && collectionDiscovery) {
+                    await collectionDiscovery;
+                    collectionKey = managedCollections.get(String(query.ParentId).toLowerCase());
+                }
+                if (!collectionKey) return getItems.call(this, query, useCache, ...rest);
+                const response = await getItems.call(this, { ...query, SortBy: 'Default', StartIndex: 0 }, false, ...rest);
+                response.Items = await rankKefinCollection(response.Items || [], collectionKey);
+                response.TotalRecordCount = response.TotalRecordCount ?? response.Items.length;
+                return response;
+            };
+            wrapped.__communityRatingInstalled = true;
+            helper.getItems = wrapped;
+        }
+
+        const builder = window.cardBuilder;
+        if (!builder || builder.__communityRatingCollectionsInstalled) return;
+        const rankItems = items => [...items].sort((left, right) => right.__communityRatingRank - left.__communityRatingRank
+            || (left.SortName || left.Name || '').localeCompare(right.SortName || right.Name || '', undefined, { sensitivity: 'base' }));
+        if (typeof builder.sortItems === 'function') {
+            const sortItems = builder.sortItems;
+            builder.sortItems = function (items, ...rest) {
+                if (Array.isArray(items) && items.some(item => item.__communityRatingCollection)) return rankItems(items);
+                return sortItems.call(this, items, ...rest);
+            };
+        }
+        for (const method of ['renderCards', 'renderSpotlightSection']) {
+            if (typeof builder[method] !== 'function') continue;
+            const original = builder[method];
+            builder[method] = function (items, ...rest) {
+                if (Array.isArray(items) && items.some(item => item.__communityRatingCollection)) items = rankItems(items);
+                return original.call(this, items, ...rest);
+            };
+        }
+        builder.__communityRatingCollectionsInstalled = true;
     }
 
     function querySignature(query) {
@@ -96,7 +195,7 @@
     }
 
     function orderCommunityItems(state, sortOrder) {
-        const key = state.mode === 'views' ? 'ViewCount' : 'LikeCount';
+        const key = { views: 'ViewCount', likes: 'LikeCount', recommendations: 'RecommendationCount', discouragements: 'DiscouragementCount' }[state.mode];
         const direction = sortOrder === 'Ascending' ? 1 : -1;
         return [...state.items].sort((left, right) => {
             const leftCount = state.counts.get(left.Id.toLowerCase())?.[key] || 0;
@@ -190,7 +289,7 @@
             }
             const query = menuOptions.query;
             lastSortContext = { route: location.hash, query };
-            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes'], ['recommendations', 'sortRecommendations'], ['discouragements', 'sortDiscouragements']]) {
                 const name = translate(key);
                 const existing = menuOptions.items.find(item => item.id === sortModeIds[mode]);
                 if (existing) existing.name = name;
@@ -219,7 +318,7 @@
         // The select menu persists its values and creates a fresh API query later.
         document.querySelectorAll('.formDialog .selectSortBy').forEach(select => {
             if (select.dataset.crSortExtended) {
-                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes'], ['recommendations', 'sortRecommendations'], ['discouragements', 'sortDiscouragements']]) {
                     const option = select.querySelector('option[value="' + sortModeIds[mode] + '"]');
                     if (option && option.textContent !== translate(key)) option.textContent = translate(key);
                 }
@@ -227,7 +326,7 @@
             }
             select.dataset.crSortExtended = 'true';
             const selected = select.value || (lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '');
-            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes'], ['recommendations', 'sortRecommendations'], ['discouragements', 'sortDiscouragements']]) {
                 if (select.querySelector('option[value="' + sortModeIds[mode] + '"]')) continue;
                 const option = document.createElement('option');
                 option.value = sortModeIds[mode];
@@ -249,7 +348,7 @@
             const native = dialog.querySelector('input.menuSortBy');
             if (!native) return;
             if (dialog.querySelector('input.menuSortBy[value="' + sortModeIds.views + '"]')) {
-                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+                for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes'], ['recommendations', 'sortRecommendations'], ['discouragements', 'sortDiscouragements']]) {
                     const input = dialog.querySelector('input.menuSortBy[value="' + sortModeIds[mode] + '"]');
                     const label = input?.closest('label')?.lastElementChild;
                     if (label?.tagName === 'SPAN' && label.textContent !== translate(key)) label.textContent = translate(key);
@@ -259,7 +358,7 @@
             const parent = native.closest('label')?.parentElement;
             if (!parent) return;
             const selected = lastSortContext?.route === location.hash ? lastSortContext.query.SortBy : '';
-            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes']]) {
+            for (const [mode, key] of [['views', 'sortViews'], ['likes', 'sortLikes'], ['recommendations', 'sortRecommendations'], ['discouragements', 'sortDiscouragements']]) {
                 const label = document.createElement('label');
                 label.className = 'radio-label-block';
                 const input = document.createElement('input', { is: 'emby-radio' });
@@ -353,6 +452,7 @@
 
     async function scan() {
         installCommunitySortSupport();
+        installKefinCollectionAdapter();
         extendSortMenus();
         if (scanning) return;
         ensureStyle();
@@ -377,6 +477,8 @@
                 });
             }
             if (!options || !options.Enabled) return;
+            const voteIds = [...new Set(targets.map(entry => entry.id))].filter(id => !personalVotes.has(id.toLowerCase()));
+            if (voteIds.length) await fetchUserVotes(voteIds);
             if (options.AdminTooltipsEnabled) await currentUserIsAdmin();
             for (const target of targets) {
                 const item = cache.get(target.id.toLowerCase());
@@ -398,23 +500,111 @@
         document.documentElement.style.setProperty('--cr-inset-x', `${Number.isFinite(options.BadgeInsetX) ? options.BadgeInsetX : 3}px`);
         document.documentElement.style.setProperty('--cr-inset-y', `${Number.isFinite(options.BadgeInsetY) ? options.BadgeInsetY : 8}px`);
         document.documentElement.style.setProperty('--cr-bg-opacity', String(options.BackgroundOpacity / 100));
-        document.documentElement.style.setProperty('--cr-card-direction', options.StackCardBadges === true ? 'column' : 'row');
+        const layout = options.CardLayout || (options.StackCardBadges === true ? 'column' : 'row');
+        document.documentElement.style.setProperty('--cr-card-layout', layout);
     }
 
-    function makeBadge(kind, count, itemId, namesKey) {
-        const row = document.createElement('span');
-        row.className = 'cr-badge';
-        row.tabIndex = 0;
+    const thumbUpIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 21h4V9H1v12zM23 10c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.48.14-.73v-2z"/></svg>';
+    const thumbDownIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22L1.14 11.27c-.09.23-.14.48-.14.73v2c0 1.1.9 2 2 2h6.3l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.58-6.59c.37-.36.59-.86.59-1.41V5c0-1.1-.9-2-2-2zM19 3v12h4V3h-4z"/></svg>';
+
+    const badgeMeta = {
+        view: ['ViewedBy', 'viewLabel', 'ViewCount', eyeIcon],
+        like: ['LikedBy', 'likeLabel', 'LikeCount', heartIcon],
+        recommend: ['RecommendedBy', 'recommendLabel', 'RecommendationCount', thumbUpIcon],
+        discourage: ['DiscouragedBy', 'discourageLabel', 'DiscouragementCount', thumbDownIcon]
+    };
+
+    function makeBadge(kind, count, itemId) {
+        const [namesKey, labelKey, , icon] = badgeMeta[kind];
+        const isVote = kind === 'recommend' || kind === 'discourage';
+        const row = document.createElement(isVote ? 'button' : 'span');
+        row.className = 'cr-badge' + (isVote ? ' cr-vote' : '');
+        if (!isVote) row.tabIndex = 0;
         row.dataset.crItemId = itemId;
+        row.dataset.crKind = kind;
+        row.dataset.count = String(count);
+        row.dataset.crLabelKey = labelKey;
         row.dataset.crNamesKey = namesKey;
-        row.dataset.crLabel = translate(kind === 'view' ? 'viewLabel' : 'likeLabel');
-        row.setAttribute('aria-label', `${row.dataset.crLabel} : ${count}`);
-        row.innerHTML = `${kind === 'view' ? eyeIcon : heartIcon}<span>${count}</span>`;
+        const label = translate(labelKey, count);
+        row.dataset.crLabel = label;
+        row.setAttribute('aria-label', label);
+        row.innerHTML = `${icon}${count > 0 || !isVote ? `<span class="cr-count">${count}</span>` : ''}`;
+        if (isVote) {
+            row.type = 'button';
+            row.dataset.kind = kind;
+            const current = personalVotes.get(itemId.toLowerCase()) || 0;
+            row.setAttribute('aria-pressed', String(current === (kind === 'recommend' ? 1 : -1)));
+            row.title = label;
+            row.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                submitVote(itemId, kind === 'recommend' ? 1 : -1, row);
+            });
+            row.addEventListener('keydown', event => event.stopPropagation());
+        }
         row.addEventListener('mouseenter', showTooltip);
         row.addEventListener('focus', showTooltip);
         row.addEventListener('mouseleave', hideTooltip);
         row.addEventListener('blur', hideTooltip);
         return row;
+    }
+
+    async function fetchUserVotes(ids) {
+        for (let start = 0; start < ids.length; start += 100) {
+            const response = await ApiClient.getJSON(apiUrl('Me/Votes', ids.slice(start, start + 100)));
+            for (const entry of response || []) personalVotes.set(entry.ItemId.toLowerCase(), entry.Vote || 0);
+        }
+    }
+
+    async function submitVote(itemId, vote, button) {
+        if (button.dataset.pending === 'true') return;
+        const key = itemId.toLowerCase();
+        const previous = personalVotes.get(key) || 0;
+        const remove = previous === vote;
+        const url = ApiClient.getUrl('CommunityRating/Me/Votes/' + encodeURIComponent(itemId));
+        button.dataset.pending = 'true';
+        button.disabled = true;
+        try {
+            const response = await ApiClient.ajax({
+                url,
+                type: remove ? 'DELETE' : 'PUT',
+                data: remove ? undefined : JSON.stringify({ Vote: vote }),
+                contentType: 'application/json'
+            });
+            personalVotes.set(key, response.Vote || 0);
+            invalidateCounts();
+            const changed = [response.Item, response.ParentSeries].filter(Boolean);
+            for (const item of changed) cache.set(item.ItemId.toLowerCase(), item);
+            queueScan();
+        } catch (error) {
+            console.warn('Community Rating vote could not be saved.', error);
+            if (window.Dashboard?.alert) window.Dashboard.alert(translate('voteError'));
+        } finally {
+            button.dataset.pending = 'false';
+            button.disabled = false;
+        }
+    }
+
+    function observeCardLayout(stack, host) {
+        if (!window.ResizeObserver || stack._crResizeObserver) return;
+        const update = () => {
+            const configured = options?.CardLayout || (options?.StackCardBadges ? 'column' : 'row');
+            stack.classList.remove('cr-layout-grid', 'cr-layout-column');
+            if (configured === 'column') { stack.classList.add('cr-layout-column'); return; }
+            if (configured === 'row') return;
+            const badges = [...stack.querySelectorAll('.cr-badge')];
+            const available = Math.max(0, host.clientWidth - (options?.BadgeInsetX || 3) - 32);
+            const rowWidth = badges.reduce((sum, badge) => sum + badge.getBoundingClientRect().width, 0) + Math.max(0, badges.length - 1) * 4;
+            if (rowWidth <= available) return;
+            const columnWidth = Math.max(...badges.map(badge => badge.getBoundingClientRect().width));
+            if (columnWidth * 2 + 4 <= available) stack.classList.add('cr-layout-grid');
+            else stack.classList.add('cr-layout-column');
+        };
+        stack._crUpdateLayout = update;
+        stack._crResizeObserver = new ResizeObserver(update);
+        stack._crResizeObserver.observe(host);
+        stack._crResizeObserver.observe(stack);
+        update();
     }
 
     function render(target, item) {
@@ -425,8 +615,9 @@
             : (target.element.querySelector('.cardScalable') || target.element.querySelector('.cardImageContainer') || target.element);
         if (!host) return;
         const existing = target.element.querySelector(target.detail ? '.cr-details-stack' : '.cr-badge-stack');
-        const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, options.AdminTooltipsEnabled, isAdmin, uiLanguage()]);
+        const signature = JSON.stringify([item.ItemId, item.ViewCount, item.LikeCount, item.RecommendationCount, item.DiscouragementCount, personalVotes.get(item.ItemId.toLowerCase()), options.AdminTooltipsEnabled, isAdmin, uiLanguage()]);
         if (existing?.dataset.crSignature === signature) {
+            if (!target.detail) existing._crUpdateLayout?.();
             if (primaryContent) {
                 host.classList.add('cr-details-top-host');
                 if (host.firstElementChild !== existing) host.prepend(existing);
@@ -444,8 +635,10 @@
         if (!target.detail) {
             if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
         }
-        stack.appendChild(makeBadge('view', item.ViewCount, item.ItemId, 'ViewedBy'));
-        if (target.detail || item.LikeCount > 0) stack.appendChild(makeBadge('like', item.LikeCount, item.ItemId, 'LikedBy'));
+        stack.appendChild(makeBadge('view', item.ViewCount, item.ItemId));
+        if (target.detail || item.LikeCount > 0) stack.appendChild(makeBadge('like', item.LikeCount, item.ItemId));
+        stack.appendChild(makeBadge('recommend', item.RecommendationCount || 0, item.ItemId));
+        stack.appendChild(makeBadge('discourage', item.DiscouragementCount || 0, item.ItemId));
 
         if (target.detail) {
             // Sit directly below the header, before the content sections, while
@@ -458,6 +651,7 @@
             else host.appendChild(stack);
         } else {
             host.appendChild(stack);
+            observeCardLayout(stack, host);
         }
     }
 
@@ -510,7 +704,10 @@
                 const result = await ApiClient.getJSON(apiUrl('Admin/Items', [itemId]));
                 if (request !== tooltipRequest || !badge.isConnected || !options.AdminTooltipsEnabled) return;
                 const entry = result.find(item => item.ItemId.toLowerCase() === cacheKey);
-                names = entry ? { ViewedBy: entry.ViewedBy || [], LikedBy: entry.LikedBy || [] } : { ViewedBy: [], LikedBy: [] };
+                names = entry ? {
+                    ViewedBy: entry.ViewedBy || [], LikedBy: entry.LikedBy || [],
+                    RecommendedBy: entry.RecommendedBy || [], DiscouragedBy: entry.DiscouragedBy || []
+                } : { ViewedBy: [], LikedBy: [], RecommendedBy: [], DiscouragedBy: [] };
                 tooltipCache.set(cacheKey, names);
             } catch (_) {
                 return;

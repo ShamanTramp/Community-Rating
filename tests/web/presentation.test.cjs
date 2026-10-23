@@ -28,17 +28,24 @@ function presentation(t, { admin = false, namesEnabled = false, rejectNames = fa
     window.setTimeout = callback => setImmediate(() => { if (!closed) callback(); });
     window.setInterval = callback => { intervals.push(callback); };
     const calls = [];
+    const voteWrites = [];
     const options = { Enabled: true, BadgeScale: 16, BackgroundOpacity: 45, AdminTooltipsEnabled: namesEnabled, StackCardBadges: false };
     window.ApiClient = {
         getUrl: route => 'https://jellyfin.invalid/' + route,
         getCurrentUser: async () => ({ Policy: { IsAdministrator: admin } }),
         getJSON: async url => {
             calls.push(url);
+            if (url.includes('/Me/Votes')) return [{ ItemId: 'movie-a', Vote: 0 }];
             if (url.includes('/Admin/')) {
                 if (rejectNames) throw new Error('Forbidden');
                 return [{ ItemId: 'movie-a', ViewedBy: noMembers ? [] : ['Alpha', 'Beta'], LikedBy: noMembers ? [] : ['Alpha'] }];
             }
-            return { Options: { ...options }, Items: [{ ItemId: 'movie-a', ViewCount: 2, LikeCount: 1 }] };
+            return { Options: { ...options, CardLayout: 'auto' }, Items: [{ ItemId: 'movie-a', ViewCount: 2, LikeCount: 1, RecommendationCount: 0, DiscouragementCount: 0 }] };
+        },
+        ajax: async request => {
+            voteWrites.push(request);
+            const vote = request.type === 'DELETE' ? null : JSON.parse(request.data).Vote;
+            return { Vote: vote, Item: { ItemId: 'movie-a', ViewCount: 2, LikeCount: 1, RecommendationCount: vote === 1 ? 1 : 0, DiscouragementCount: vote === -1 ? 1 : 0 } };
         }
     };
     Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return this.classList.contains('cr-tooltip') ? 180 : 0; } });
@@ -48,8 +55,38 @@ function presentation(t, { admin = false, namesEnabled = false, rejectNames = fa
         element.getBoundingClientRect = () => ({ left: 100, top: 200, right: 160, bottom: 230, width: 60, height: 30 });
         element.dispatchEvent(new window.Event(type));
     }
-    return { window, document: window.document, calls, options, intervals, fire };
+    return { window, document: window.document, calls, voteWrites, options, intervals, fire };
 }
+
+test('thumbs are white and unnumbered at zero, colored on hover, and save one toggleable vote', async t => {
+    const f = presentation(t);
+    await settle();
+    const recommend = f.document.querySelector('.cr-vote[data-kind="recommend"]');
+    const discourage = f.document.querySelector('.cr-vote[data-kind="discourage"]');
+    assert.equal(recommend.getAttribute('aria-pressed'), 'false');
+    assert.equal(discourage.getAttribute('aria-pressed'), 'false');
+    assert.equal(recommend.querySelector('.cr-count'), null);
+    assert.equal(discourage.querySelector('.cr-count'), null);
+    const styles = f.document.getElementById('communityRatingStyles').textContent;
+    assert.match(styles, /data-kind="recommend"\]\{color:var\(--cr-recommend-color,#fff\)\}/);
+    assert.match(styles, /data-kind="discourage"\]\{color:var\(--cr-discourage-color,#fff\)\}/);
+    assert.match(styles, /data-kind="recommend"]:hover[^}]*color:#43d17b/);
+    assert.match(styles, /data-kind="discourage"]:hover[^}]*color:#ff5a62/);
+    await recommend.click();
+    await settle();
+    assert.equal(f.voteWrites[0].type, 'PUT');
+    assert.deepEqual(JSON.parse(f.voteWrites[0].data), { Vote: 1 });
+    const updated = f.document.querySelector('.cr-vote[data-kind="recommend"]');
+    assert.equal(updated.getAttribute('aria-pressed'), 'true');
+    assert.equal(updated.querySelector('.cr-count').textContent, '1');
+    assert.equal(f.voteWrites.length, 1);
+    await updated.click();
+    await settle();
+    assert.equal(f.voteWrites[1].type, 'DELETE');
+    const reset = f.document.querySelector('.cr-vote[data-kind="recommend"]');
+    assert.equal(reset.getAttribute('aria-pressed'), 'false');
+    assert.equal(reset.querySelector('.cr-count'), null);
+});
 
 for (const admin of [false, true]) {
     test(`label tooltips appear above icons when name lists are off (administrator=${admin})`, async t => {
@@ -59,17 +96,17 @@ for (const admin of [false, true]) {
         f.fire(badges[0], 'mouseenter');
         await settle();
         const tip = f.document.getElementById('communityRatingTooltip');
-        assert.equal(tip.textContent, 'Vu par les membres');
+        assert.equal(tip.textContent, 'Vu par 2 membres');
         assert.equal(tip.hidden, false);
         assert.equal(tip.style.top, '132px');
         assert.equal(tip.style.left, '40px');
         assert.equal(badges[0].getAttribute('aria-describedby'), tip.id);
-        assert.equal(badges[0].getAttribute('aria-label'), 'Vu par les membres : 2');
+        assert.equal(badges[0].getAttribute('aria-label'), 'Vu par 2 membres');
         f.fire(badges[0], 'mouseleave');
         assert.equal(tip.hidden, true);
         f.fire(badges[1], 'focus');
         await settle();
-        assert.equal(tip.textContent, 'Aimé par les membres');
+        assert.equal(tip.textContent, 'Aimé par 1 membre');
         assert.equal(badges[1].tabIndex, 0);
         f.document.dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'Escape' }));
         assert.equal(tip.hidden, true);
@@ -83,7 +120,7 @@ test('ordinary users keep labels when administrator name lists are enabled', asy
     await settle();
     f.fire(f.document.querySelector('.cr-badge'), 'focus');
     await settle();
-    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par les membres');
+    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par 2 membres');
     assert.equal(f.calls.some(url => url.includes('/Admin/')), false);
 });
 
@@ -93,10 +130,10 @@ test('administrators get the label followed by the correct private name list', a
     const badges = f.document.querySelectorAll('.cr-details-stack .cr-badge');
     f.fire(badges[0], 'focus');
     await settle();
-    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par les membres\nAlpha\nBeta');
+    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par 2 membres\nAlpha\nBeta');
     f.fire(badges[1], 'mouseenter');
     await settle();
-    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Aimé par les membres\nAlpha');
+    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Aimé par 1 membre\nAlpha');
     assert.equal(badges[0].hasAttribute('aria-describedby'), false);
     assert.equal(f.calls.filter(url => url.includes('/Admin/')).length, 1);
     f.window.dispatchEvent(new f.window.Event('scroll'));
@@ -109,7 +146,7 @@ test('a rejected names request does not hide the public label', async t => {
     f.fire(f.document.querySelector('.cr-badge'), 'mouseenter');
     await settle();
     const tip = f.document.querySelector('.cr-tooltip');
-    assert.equal(tip.textContent, 'Vu par les membres');
+    assert.equal(tip.textContent, 'Vu par 2 membres');
     assert.equal(tip.hidden, false);
 });
 
@@ -236,11 +273,11 @@ for (const language of ['en', 'de-DE']) {
         const badges = f.document.querySelectorAll('.cr-details-stack .cr-badge');
         f.fire(badges[0], 'focus');
         await settle();
-        assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Viewed by members\nNo members');
-        assert.match(badges[0].getAttribute('aria-label'), /^Viewed by members/);
+        assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Viewed by 2 members\nNo members');
+        assert.match(badges[0].getAttribute('aria-label'), /^Viewed by 2 members/);
         f.fire(badges[1], 'mouseenter');
         await settle();
-        assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Liked by members\nNo members');
+        assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Liked by 1 member\nNo members');
     });
 }
 
@@ -250,15 +287,15 @@ test('changing Jellyfin language refreshes badge labels without another count re
     const before = f.calls.length;
     f.fire(f.document.querySelector('.cr-badge'), 'focus');
     await settle();
-    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par les membres');
+        assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Vu par 2 membres');
     f.document.documentElement.lang = 'en-US';
     await settle();
     const badge = f.document.querySelector('.cr-badge');
-    assert.match(badge.getAttribute('aria-label'), /^Viewed by members/);
+    assert.match(badge.getAttribute('aria-label'), /^Viewed by 2 members/);
     assert.equal(f.document.querySelector('.cr-tooltip').hidden, true);
     f.fire(badge, 'mouseenter');
     await settle();
-    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Viewed by members');
+    assert.equal(f.document.querySelector('.cr-tooltip').textContent, 'Viewed by 2 members');
     assert.equal(f.calls.length, before);
 });
 
@@ -280,7 +317,7 @@ test('every configuration label has English fallback and follows Jellyfin langua
     window.document.documentElement.lang = 'fr-FR';
     await settle();
     assert.equal(page.querySelector('[data-cr-i18n="showCounters"]').textContent, 'Afficher les compteurs de vues et de favoris');
-    assert.equal(page.querySelector('[data-cr-i18n="layoutStacked"]').textContent, 'Empilés');
+    assert.equal(page.querySelector('[data-cr-i18n="layoutStacked"]').textContent, 'Une colonne');
     assert.equal(page.querySelector('[data-cr-i18n="save"]').textContent, 'Enregistrer');
     assert.equal(labels.filter(element => element.textContent !== english.get(element.getAttribute('data-cr-i18n'))).length, labels.length);
     window.document.documentElement.lang = 'es-ES';

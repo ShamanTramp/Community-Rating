@@ -2,65 +2,74 @@
 
 ![Community Rating illustration](assets/community-rating-cover.png)
 
-**Community Rating** is a Jellyfin plugin that shows how many members have watched or favorited each movie, series, or episode. It adds view and favorite counters to media cards and detail pages in Jellyfin Web.
+**Community Rating** aggregates member views, favorites, recommendations, and negative recommendations for Jellyfin movies, series, and episodes. The server stores the data and provides native ranking collections; JavaScript Injector adds interactive counters and voting to Jellyfin Web.
 
 ## Features
 
-- Counts each active, included account once, using Jellyfin's **played** and **favorite** markers. Repeated playback does not increase the count.
-- Counts a series as viewed by a member when that member has watched at least one episode. Watching more episodes does not add more series views.
-- Counts favorites on the movie, episode, or series itself.
-- Ignores disabled accounts and user names listed in the exclusions.
-- Shows white view and favorite icons in the upper-left corner of media cards, either on one line or stacked vertically. Views always appear first, including zero; favorites are hidden when their count is zero.
-- Places both counters at the top of the media content column, directly below the header and rating block, including zero favorites. The row retains Jellyfin's horizontal content padding and poster offsets, with no extra gap above it. Detail size follows the configured base counter size multiplied by an optional enlargement factor; the default factor of 1 matches cards (16 px by default).
-- Adds **Viewed by members** and **Liked by members** to supported library sort menus (**Vus par les membres** and **Aimés par les membres** in French). Both default to descending order.
-- Shows a tooltip above each counter for everyone, on hover or keyboard focus: **Viewed by members** for views and **Liked by members** for favorites (**Vu par les membres** and **Aimé par les membres** in French). Press Escape to dismiss it.
-- Administrators can optionally see member names below the tooltip label, with one name per line. Name lists are disabled by default; the names endpoint requires administrator access. Label tooltips remain available regardless of this setting.
-- Recalculates affected aggregates after played or favorite markers change, with a full reconciliation available as a scheduled task.
+- Counts each active, included account once for played and favorite markers. Repeated playback does not increase the count.
+- Counts a series as viewed when a member has played at least one episode; counts a favorite only when the series itself is a favorite.
+- Lets each account recommend or discourage a movie, series, or episode. Clicking the active vote again removes it; clicking the other thumb switches direction.
+- Stores votes separately from Jellyfin's native `Likes` marker, so Kefin Tweaks' **Watchlist** does not add or remove recommendations.
+- Aggregates episode votes into their series. Each member contributes at most once to each of the positive and negative series scores, even when voting on multiple episodes and the series itself.
+- Excludes disabled, deleted, and configured accounts. Administrator tooltips can show included member names when enabled.
+- Shows views, favorites, recommendations, and negative recommendations on cards and details. Views stay visible at zero; card favorites hide at zero; zero-count thumbs are white and show no number.
+- Colors thumbs green and red on hover, keyboard focus, and after a vote. The member's own vote is exposed accessibly.
+- Provides automatic, one-line, two-column, and one-column card layouts. Automatic mode reserves space for Jellyfin's watched marker in the upper-right corner.
+- Shows count-aware French and English tooltips, with English fallback, and adds four community sorts to supported library lists.
+- Creates eight visible native Jellyfin collections: views, favorites, recommendations, and negative recommendations, each for movies and series. Episode votes contribute to series collections; episodes are not added directly.
+- Adapts Kefin Tweaks collection sections to preserve Community Rating ranking. Other compatible clients, including Wholfin, can use the native collections without JavaScript injection.
 
-The server updates its cache when markers change. Open web pages refresh counters every 30 seconds and shortly after local marker actions. Community sorting fetches the full filtered list before applying pagination, so the first sort can take longer on large libraries.
-
-Use the **A–Z / Sort** button in a movie, series, or episode list to find the member sorts. Both Jellyfin's radio-button menu and its sort drop-down are supported. The selected sort is preserved by Jellyfin's normal list settings; pages and filters keep applying to the whole sorted result.
-
-Counter labels, sort options, and the configuration page follow Jellyfin's interface language. French and English are included, with English as the fallback for other languages or missing translations.
+Community sorts rank the complete filtered result before pagination. The first sort can take longer on large libraries. Vote, played, and favorite changes refresh affected totals; collection membership and order are reconciled in the background and by the scheduled task.
 
 ## Installation
 
-Install [JavaScript Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) first. Community Rating registers its bundled script with JavaScript Injector automatically when Jellyfin starts.
+Install [JavaScript Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) for the Jellyfin Web interface. Community Rating registers its bundled script automatically when Jellyfin starts. Kefin Tweaks is optional.
 
-In Jellyfin, open **Dashboard → Plugins → Repositories**, then add the repository manifest:
+In Jellyfin, open **Dashboard → Plugins → Repositories**, then add this manifest:
 
 ```text
 https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/manifest.json
 ```
 
-Save the repository, open the plugin catalog, select **Available** if needed, then install **Community Rating**. Restart Jellyfin and reload the web client when installation is complete. The [0.1.5.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.1.5.0.zip) is also available directly. After upgrading, fully reload the browser page to replace any script left running by the previous version.
+Save the repository, open the plugin catalog, select **Available** if needed, and install **Community Rating**. Restart Jellyfin and reload the Web client. The [0.2.0.0 plugin package](https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.2.0.0.zip) is also available directly. After upgrading, fully reload the page to replace any script left running by the previous version.
 
-Jellyfin must be able to access the manifest and package files on GitHub to install and update the plugin.
-
-## Configuration and usage
+## Configuration
 
 Open **Dashboard → Plugins → Community Rating**:
 
 | Option | Default | Description |
 | --- | --- | --- |
-| Show counters | Enabled | Displays member view and favorite counters. |
-| Excluded accounts | Empty | Jellyfin user names separated by commas. Spaces around names and letter case are ignored. Disabled accounts are always excluded. |
-| Administrator tooltips | Disabled | Adds the included member names to administrators' tooltips. Label tooltips remain available to everyone. Names are never included in the public counter response. |
-| Card counter layout | One line | Choose one line or vertically stacked counters. Views come first, favorites second. |
-| Icon and counter size | 16 px | Sets the base size from 12 to 28 px, used by both cards and details. |
-| Detail enlargement factor | 1 | Multiplies the base size on detail pages only, from 1 to 3. For example, a 16 px base with a factor of 1.25 gives 20 px detail counters. |
-| Horizontal inset | 3 px | Sets the distance from the left edge of a card, from 0 to 32 px. |
-| Vertical inset | 8 px | Sets the distance from the top edge of a card, from 0 to 32 px. |
-| Background opacity | 45% | Adjusts the counter background from 0% to 90%. |
-| Full reconciliation | Every 6 hours | Choose hourly if a complete rebuild takes less than five minutes; otherwise use six hours. Changing this setting updates the task's interval trigger. |
+| Show counters | Enabled | Shows aggregate views, favorites, recommendations, and negative recommendations. |
+| Excluded accounts | Empty | Comma-separated Jellyfin user names. Disabled accounts are always excluded. |
+| Administrator tooltips | Disabled | Lets administrators see included member names in tooltips. The server protects the names endpoint. |
+| Card layout | Automatic | Fits one line, two columns, or one column. Manual modes are also available. |
+| Ranking collections | Enabled | Creates and synchronizes eight visible movie and series collections. Use **Synchronize collections now** for a manual refresh. |
+| Icon and counter size | 16 px | Base size from 12 to 28 px. |
+| Detail enlargement factor | 1 | Multiplies the base size on detail pages, from 1 to 3. |
+| Horizontal and vertical inset | 3 px / 8 px | Positions the card indicators from the upper-left corner. |
+| Background opacity | 45% | Sets badge background opacity from 0% to 90%. |
+| Full reconciliation | Every 6 hours | Use hourly if a full rebuild takes less than five minutes; otherwise use six hours. |
 
-To rebuild the statistics manually, run **Rebuild Community Rating statistics** from **Dashboard → Scheduled Tasks**. The task supports progress reporting and cancellation. The cache is also initialized at startup; uncached media are calculated when requested.
+Run **Rebuild Community Rating statistics** from **Dashboard → Scheduled Tasks** to rebuild aggregates and reconcile native collections. The task supports progress reporting and cancellation.
 
-The web client picks up display changes on its next refresh. Exclusion changes rebuild the server cache. New defaults do not overwrite values already saved in your configuration.
+### Ranking collections and Kefin Tweaks
+
+The four recommendation collections use these exact names:
+
+- Films recommandés par les membres
+- Films déconseillés par les membres
+- Séries recommandées par les membres
+- Séries déconseillées par les membres
+
+The other four collections cover views and favorites for films and series. They are ordinary, visible Jellyfin collections, so clients such as Wholfin can add them to home pages. In Kefin Tweaks, add each collection as a collection-based custom home section. Community Rating keeps these sections ordered by the corresponding member total. The Web script is needed only for Kefin's ranking integration; collection membership is stored by Jellyfin.
+
+### Vote storage
+
+Community votes are stored separately at `CommunityRating/votes.json` under Jellyfin's data directory. Back up Jellyfin's data directory to preserve votes during server migrations. The file stores Jellyfin user and media IDs with vote direction, not authentication tokens.
 
 ## Compatibility
 
-Targets Jellyfin **10.11.11** and **.NET 9**. The web interface requires JavaScript Injector; the integration was tested with JavaScript Injector **3.1.0.0**. Card overlays and custom sort menus apply to Jellyfin Web. Native clients do not load the injected script.
+Targets Jellyfin **10.11.11** and **.NET 9**. JavaScript Injector is required for Web badges, vote buttons, tooltips, custom sorts, and Kefin Tweaks ranking integration. Vote storage, aggregates, and native collections are maintained by the server and available to other compatible clients.
 
 ## Development
 
@@ -72,7 +81,7 @@ npm ci --ignore-scripts
 npm test
 ```
 
-The web tests use Node.js 22, including jsdom fixtures for Jellyfin's native sort menus; they do not require a running Jellyfin server. CI builds and runs both test suites on pushes to `main` and pull requests. Publishing a GitHub release verifies the version tag, produces the installable ZIP, computes its checksum, and updates `manifest.json`.
+The web tests use Node.js 22 and jsdom fixtures for voting, rendering, and Jellyfin and Kefin Tweaks sorts. CI builds and runs both test suites on pushes to `main` and pull requests. Publishing a GitHub release verifies the tag version, produces the installable ZIP, calculates its checksum, and updates `manifest.json`.
 
 ## License
 

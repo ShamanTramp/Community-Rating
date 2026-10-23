@@ -14,7 +14,7 @@ public sealed class CommunityApiContractTests
     [Fact]
     public void PublicResponseCannotSerializeMemberNames()
     {
-        var stats = new CommunityItemStats(Guid.NewGuid(), 2, 1, ["PrivateAlpha", "PrivateBeta"], ["PrivateAlpha"]);
+        var stats = new CommunityItemStats(Guid.NewGuid(), 2, 1, ["PrivateAlpha", "PrivateBeta"], ["PrivateAlpha"], ["PrivateAlpha"], ["PrivateBeta"]);
         var response = new CommunityStatsResponse([CommunityItemCounts.FromStats(stats)], new(true, 16, 3, 8, 45, true, false, 1.25));
         var json = JsonSerializer.Serialize(response);
 
@@ -22,11 +22,15 @@ public sealed class CommunityApiContractTests
         var item = document.RootElement.GetProperty("Items")[0];
         Assert.Equal(2, item.GetProperty("ViewCount").GetInt32());
         Assert.Equal(1, item.GetProperty("LikeCount").GetInt32());
-        Assert.Equal(3, item.EnumerateObject().Count());
+        Assert.Equal(1, item.GetProperty("RecommendationCount").GetInt32());
+        Assert.Equal(1, item.GetProperty("DiscouragementCount").GetInt32());
+        Assert.Equal(5, item.EnumerateObject().Count());
         Assert.Equal(1.25, document.RootElement.GetProperty("Options").GetProperty("DetailScaleFactor").GetDouble());
         Assert.DoesNotContain("Private", json);
         Assert.DoesNotContain("ViewedBy", json);
         Assert.DoesNotContain("LikedBy", json);
+        Assert.DoesNotContain("RecommendedBy", json);
+        Assert.DoesNotContain("DiscouragedBy", json);
     }
 
     [Fact]
@@ -35,6 +39,15 @@ public sealed class CommunityApiContractTests
         var method = typeof(CommunityRatingController).GetMethod(nameof(CommunityRatingController.GetAdminItems))!;
         Assert.Equal(Policies.RequiresElevation, method.GetCustomAttribute<AuthorizeAttribute>()?.Policy);
         Assert.Null(method.GetCustomAttribute<AllowAnonymousAttribute>());
+    }
+
+    [Fact]
+    public void PersonalVoteMutationRequiresAuthentication()
+    {
+        var setVote = typeof(CommunityRatingController).GetMethod(nameof(CommunityRatingController.SetMyVote))!;
+        var removeVote = typeof(CommunityRatingController).GetMethod(nameof(CommunityRatingController.DeleteMyVote))!;
+        Assert.NotNull(setVote.GetCustomAttribute<AuthorizeAttribute>());
+        Assert.NotNull(removeVote.GetCustomAttribute<AuthorizeAttribute>());
     }
 
     [Fact]
@@ -54,11 +67,13 @@ public sealed class CommunityApiContractTests
     }
 
     [Fact]
-    public void DefaultsUseOneLineAndHideAdministratorTooltips()
+    public void DefaultsUseAutomaticCardsVisibleCollectionsAndHiddenAdministratorTooltips()
     {
         var config = new PluginConfiguration();
         Assert.False(config.StackCardBadges);
         Assert.False(config.EnableAdminTooltips);
+        Assert.Equal("auto", config.CardLayout);
+        Assert.True(config.RankingCollectionsEnabled);
         Assert.Equal(3, config.BadgeInsetX);
         Assert.Equal(8, config.BadgeInsetY);
         Assert.Equal(1d, config.DetailScaleFactor);

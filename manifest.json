@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "0.2.0.0",
+        "changelog": "Add persistent positive and negative member votes, episode-to-series vote aggregation, four community sorts, adaptive thumb badges, Kefin Tweaks ranking support, and eight visible native Jellyfin collections for movies and series.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ShamanTramp/Community-Rating/main/packages/community-rating-0.2.0.0.zip",
+        "checksum": "df032baa8d8a19ef0f6b824920f99484",
+        "timestamp": "2026-10-23T16:24:10Z"
+      },
+      {
         "version": "0.1.5.0",
         "changelog": "Fix the large gap above detail counters caused by float clearing; keep the counters directly below the header and centered within the information column.",
         "targetAbi": "10.11.11.0",

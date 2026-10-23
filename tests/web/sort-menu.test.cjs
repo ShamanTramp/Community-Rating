@@ -5,7 +5,7 @@ const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const source = fs.readFileSync(path.join(__dirname, '../../src/Jellyfin.Plugin.CommunityRating/Web/community-rating.js'), 'utf8');
 
-function clientFixture(t, route = '#/movies', language = 'fr') {
+function clientFixture(t, route = '#/movies', language = 'fr', kefin = false) {
     const dom = new JSDOM('<!doctype html><html lang="' + language + '"><head></head><body><button class="btnSort">Sort</button></body></html>', {
         url: 'https://jellyfin.invalid/web/' + route, runScripts: 'outside-only'
     });
@@ -27,10 +27,14 @@ function clientFixture(t, route = '#/movies', language = 'fr') {
         getUrl: route => 'https://jellyfin.invalid/' + route,
         getCurrentUserId: () => 'member',
         getCurrentUser: async () => ({ Policy: { IsAdministrator: false } }),
-        getJSON: async url => ({
-            Options: { Enabled: true, AdminTooltipsEnabled: false },
-            Items: new URL(url).searchParams.getAll('ids').map(ItemId => ({ ItemId, ViewCount: counts[ItemId][0], LikeCount: counts[ItemId][1] }))
-        }),
+        getJSON: async url => url.includes('/Collections')
+            ? [{ Id: 'collection-recommended', Key: 'movie-recommended' }]
+            : url.includes('/Me/Votes')
+                ? new URL(url).searchParams.getAll('ids').map(ItemId => ({ ItemId, Vote: 0 }))
+            : ({
+                Options: { Enabled: true, AdminTooltipsEnabled: false },
+                Items: new URL(url).searchParams.getAll('ids').map(ItemId => ({ ItemId, ViewCount: counts[ItemId][0], LikeCount: counts[ItemId][1], RecommendationCount: counts[ItemId][2] || 0, DiscouragementCount: counts[ItemId][3] || 0 }))
+            }),
         getItems: async (userId, query) => {
             requests.push({ userId, ...query });
             assert.ok(!String(query.SortBy).includes('CommunityRatingViews'));
@@ -39,10 +43,47 @@ function clientFixture(t, route = '#/movies', language = 'fr') {
             return { Items: items.slice(query.StartIndex || 0, (query.StartIndex || 0) + (query.Limit || items.length)), TotalRecordCount: items.length };
         }
     };
+    if (kefin) {
+        const sectionItems = [library[4], library[2], library[3]];
+        counts['item-2'] = [0, 0, 30, 0];
+        counts['item-3'] = [0, 0, 10, 20];
+        counts['item-4'] = [0, 0, 20, 5];
+        window.apiHelper = { getItems: async (query, useCache) => {
+            requests.push({ kefin: true, ...query, useCache });
+            return { Items: sectionItems, TotalRecordCount: sectionItems.length };
+        } };
+        window.cardBuilder = {
+            sortItems: items => [...items].reverse(),
+            renderCards: items => items,
+            renderSpotlightSection: items => items
+        };
+    }
     window.eval(source);
     const settle = async () => { for (let index = 0; index < 12; index++) await new Promise(resolve => setImmediate(resolve)); };
     return { window, document: window.document, requests, library, counts, settle };
 }
+
+test('Kefin Tweaks native collection sections preserve the Community Rating ranking', async t => {
+    const f = clientFixture(t, '#/home', 'en', true);
+    await f.settle();
+    const result = await f.window.apiHelper.getItems({ ParentId: 'collection-recommended', SortBy: 'DateAdded', Limit: 3 }, true);
+    assert.equal(f.requests.at(-1).SortBy, 'Default');
+    assert.equal(f.requests.at(-1).useCache, false);
+    assert.deepEqual(result.Items.map(item => [item.Id, item.__communityRatingRank]), [['item-2', 30], ['item-4', 20], ['item-3', 10]]);
+    assert.deepEqual(Array.from(f.window.cardBuilder.sortItems(result.Items), item => item.Id), ['item-2', 'item-4', 'item-3']);
+});
+
+test('recommendation and negative recommendation sorts rank the full library', async t => {
+    const f = clientFixture(t);
+    f.counts['item-400'] = [0, 0, 25, 1];
+    f.counts['item-300'] = [0, 0, 2, 30];
+    const query = { IncludeItemTypes: 'Movie', SortBy: 'CommunityRatingRecommendations', SortOrder: 'Descending', StartIndex: 0, Limit: 1 };
+    let result = await f.window.ApiClient.getItems('member', query);
+    assert.equal(result.Items[0].Id, 'item-400');
+    query.SortBy = 'CommunityRatingDiscouragements';
+    result = await f.window.ApiClient.getItems('member', query);
+    assert.equal(result.Items[0].Id, 'item-300');
+});
 
 // Match Jellyfin Web 10.11.11 libraryBrowser's native radio change handlers.
 // The plugin must reach these handlers even without a global LibraryBrowser.
@@ -134,7 +175,7 @@ test('generic select menu sorts fresh query objects across pages and preserves f
     const dialog = selectDialog(f);
     await f.settle();
     const select = dialog.querySelector('.selectSortBy');
-    assert.equal(select.options.length, 4);
+    assert.equal(select.options.length, 6);
     select.value = 'CommunityRatingViews'; choose(f, select);
     const settings = { SortBy: select.value, SortOrder: dialog.querySelector('.selectSortOrder').value };
     assert.equal(settings.SortOrder, 'Descending');
@@ -174,7 +215,7 @@ test('sort button installs the classic hook immediately when its module loads la
         callback() { refreshes.push(f.window.ApiClient.getItems('member', query)); }
     }));
     f.document.querySelector('.btnSort').click();
-    assert.equal(shown.items.length, 3);
+    assert.equal(shown.items.length, 5);
     const dialog = f.document.querySelector('.formDialog');
     choose(f, dialog.querySelector('input[value="CommunityRatingLikes"]'));
     const result = await refreshes.at(-1);
